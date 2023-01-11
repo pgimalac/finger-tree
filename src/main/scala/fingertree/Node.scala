@@ -19,15 +19,17 @@ sealed trait Node[T, M]:
 
     this match {
       case Leaf(a) => depth == 0
-      case Node2(left, right, _) =>
-        depth != 0
-        && left.isWellFormed(depth - 1)
-        && right.isWellFormed(depth - 1)
-      case Node3(left, middle, right, _) =>
-        depth != 0
-        && left.isWellFormed(depth - 1)
-        && middle.isWellFormed(depth - 1)
-        && right.isWellFormed(depth - 1)
+      case Node2(left, right, measure) =>
+        depth != 0 &&
+        left.isWellFormed(depth - 1) &&
+        right.isWellFormed(depth - 1) &&
+        measure == m(left.measure(), right.measure())
+      case Node3(left, middle, right, measure) =>
+        depth != 0 &&
+        left.isWellFormed(depth - 1) &&
+        middle.isWellFormed(depth - 1) &&
+        right.isWellFormed(depth - 1) &&
+        measure == m(left.measure(), middle.measure(), right.measure())
     }
   }
 
@@ -67,8 +69,8 @@ sealed trait Node[T, M]:
       }
     }
   }.ensuring(res =>
-    !res.isEmpty
-      && res.reverse == this.toListR(depth)
+    !res.isEmpty &&
+      res.reverse == this.toListR(depth)
   )
 
   /// Constructs a list from a node, according to a reversed in-order traversal
@@ -96,9 +98,9 @@ sealed trait Node[T, M]:
         Digit3(left, middle, right, measure)
     }
   }.ensuring(res =>
-    res.isWellFormed(depth - 1)
-      && res.toListL(depth - 1) == this.toListL(depth)
-      && res.toListR(depth - 1) == this.toListR(depth)
+    res.isWellFormed(depth - 1) &&
+      res.toListL(depth - 1) == this.toListL(depth) &&
+      res.toListR(depth - 1) == this.toListR(depth)
   )
 
   def measure()(implicit m: Measure[T, M]): M = {

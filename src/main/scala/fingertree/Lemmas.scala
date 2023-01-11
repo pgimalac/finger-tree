@@ -331,4 +331,16 @@ object FingerTreeLemmas {
         }
       }
   }.holds
+
+  def associativeMeasure[T, M](a: M, b: M, c: M, d: M)(implicit
+      m: Measure[T, M]
+  ): Boolean = {
+    require(m.isAssociative)
+
+    val res = m(m(m(a, b), c), d)
+    res == m(m(a, b), m(c, d)) &&
+    res == m(a, m(m(b, c), d)) &&
+    res == m(a, m(b, m(c, d))) &&
+    res == m(m(a, m(b, c)), d)
+  }.holds
 }

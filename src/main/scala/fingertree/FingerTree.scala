@@ -22,10 +22,11 @@ sealed trait FingerTree[T, M]:
     this match {
       case Empty()       => true
       case Single(value) => value.isWellFormed(depth)
-      case Deep(prefix, spine, suffix, _) =>
-        prefix.isWellFormed(depth)
-        && spine.isWellFormed(depth + 1)
-        && suffix.isWellFormed(depth)
+      case Deep(prefix, spine, suffix, measure) =>
+        prefix.isWellFormed(depth) &&
+        spine.isWellFormed(depth + 1) &&
+        suffix.isWellFormed(depth) &&
+        measure == m(prefix.measure(), spine.measure(), suffix.measure())
     }
   }
 
@@ -50,8 +51,8 @@ sealed trait FingerTree[T, M]:
       case Cons(h, t) => toTreeL(t).addL(h)
     }
   }.ensuring(res =>
-    res.isWellFormed
-      && res.toListL() == elems
+    res.isWellFormed &&
+      res.toListL() == elems
   )
 
   /// Constructs a tree from a list, adding repeatedly to the right of the tree
@@ -65,8 +66,8 @@ sealed trait FingerTree[T, M]:
       case Cons(h, t) => toTreeR(t).addR(h)
     }
   }.ensuring(res =>
-    res.isWellFormed
-      && res.toListR() == elems
+    res.isWellFormed &&
+      res.toListR() == elems
   )
 
   /// Constructs a list from a tree, according to an in-order traversal
@@ -131,15 +132,18 @@ sealed trait FingerTree[T, M]:
       m: Measure[T, M]
   ): FingerTree[T, M] = {
     require(
-      depth >= 0
-        && m.isValid
-        && this.isWellFormed(depth)
-        && value.isWellFormed(depth)
+      depth >= 0 &&
+        m.isValid &&
+        this.isWellFormed(depth) &&
+        value.isWellFormed(depth)
     )
 
     this match {
-      case Empty() => Single(value)
+      case Empty() =>
+        check(m(value.measure(), m.zero) == value.measure())
+        Single(value)
       case Single(existingValue) =>
+        check(m(value.measure(), m.zero) == value.measure())
         Deep(
           Digit1(value),
           Empty(),
@@ -160,6 +164,16 @@ sealed trait FingerTree[T, M]:
         )
 
         val newPrefix = Digit2(value, a, m(value.measure(), a.measure()))
+        check(
+          m(
+            value.measure(),
+            m(a.measure(), spine.measure(), suffix.measure())
+          ) == m(
+            m(value.measure(), a.measure()),
+            spine.measure(),
+            suffix.measure()
+          )
+        )
         Deep(
           newPrefix,
           spine,
@@ -286,9 +300,10 @@ sealed trait FingerTree[T, M]:
       }
     }
   }.ensuring(res =>
-    res.isWellFormed(depth)
-      && res.toListL(depth) == value.toListL(depth) ++ this.toListL(depth)
-      && res.toListR(depth) == this.toListR(depth) ++ value.toListR(depth)
+    res.isWellFormed(depth) &&
+      res.toListL(depth) == value.toListL(depth) ++ this.toListL(depth) &&
+      res.toListR(depth) == this.toListR(depth) ++ value.toListR(depth) &&
+      res.measure() == m(value.measure(), this.measure())
   )
 
   // Prepends a list of values to the left end of the tree
@@ -296,10 +311,10 @@ sealed trait FingerTree[T, M]:
       m: Measure[T, M]
   ): FingerTree[T, M] = {
     require(
-      depth >= 0
-        && m.isValid
-        && this.isWellFormed(depth)
-        && elems.forall(_.isWellFormed(depth))
+      depth >= 0 &&
+        m.isValid &&
+        this.isWellFormed(depth) &&
+        elems.forall(_.isWellFormed(depth))
     )
 
     elems match {
@@ -320,11 +335,11 @@ sealed trait FingerTree[T, M]:
       }
     }
   }.ensuring(res =>
-    res.isWellFormed(depth)
-      && res
-        .toListL(depth) == Helpers.toListL(elems, depth) ++ this.toListL(depth)
-      && res
-        .toListR(depth) == this.toListR(depth) ++ Helpers.toListR(elems, depth)
+    res.isWellFormed(depth) &&
+      res.toListL(depth) ==
+      Helpers.toListL(elems, depth) ++ this.toListL(depth) &&
+      res.toListR(depth) ==
+      this.toListR(depth) ++ Helpers.toListR(elems, depth)
   )
 
   /// A wrapper around addL(Node[T], BigInt) that begins from the root of the tree
@@ -333,9 +348,10 @@ sealed trait FingerTree[T, M]:
 
     this.addL(Leaf(value), 0)
   }.ensuring(res =>
-    res.isWellFormed
-      && res.toListL(0) == value :: this.toListL(0)
-      && res.toListR(0) == this.toListR(0) :+ value
+    res.isWellFormed &&
+      res.toListL(0) == value :: this.toListL(0) &&
+      res.toListR(0) == this.toListR(0) :+ value &&
+      res.measure() == m(m(value), this.measure())
   )
 
   /// Adds a value to the right end of the tree
@@ -343,10 +359,10 @@ sealed trait FingerTree[T, M]:
       m: Measure[T, M]
   ): FingerTree[T, M] = {
     require(
-      depth >= 0
-        && m.isValid
-        && this.isWellFormed(depth)
-        && value.isWellFormed(depth)
+      depth >= 0 &&
+        m.isValid &&
+        this.isWellFormed(depth) &&
+        value.isWellFormed(depth)
     )
 
     this match {
@@ -498,9 +514,10 @@ sealed trait FingerTree[T, M]:
       }
     }
   }.ensuring(res =>
-    res.isWellFormed(depth)
-      && res.toListR(depth) == value.toListR(depth) ++ this.toListR(depth)
-      && res.toListL(depth) == this.toListL(depth) ++ value.toListL(depth)
+    res.isWellFormed(depth) &&
+      res.toListR(depth) == value.toListR(depth) ++ this.toListR(depth) &&
+      res.toListL(depth) == this.toListL(depth) ++ value.toListL(depth) &&
+      res.measure() == m(this.measure(), value.measure())
   )
 
   /// Appends a list of values to the right end of the tree
@@ -508,10 +525,10 @@ sealed trait FingerTree[T, M]:
       m: Measure[T, M]
   ): FingerTree[T, M] = {
     require(
-      depth >= 0
-        && m.isValid
-        && this.isWellFormed(depth)
-        && elems.forall(_.isWellFormed(depth))
+      depth >= 0 &&
+        m.isValid &&
+        this.isWellFormed(depth) &&
+        elems.forall(_.isWellFormed(depth))
     )
 
     elems match {
@@ -532,11 +549,11 @@ sealed trait FingerTree[T, M]:
       }
     }
   }.ensuring(res =>
-    res.isWellFormed(depth)
-      && res
-        .toListR(depth) == Helpers.toListR(elems, depth) ++ this.toListR(depth)
-      && res
-        .toListL(depth) == this.toListL(depth) ++ Helpers.toListL(elems, depth)
+    res.isWellFormed(depth) &&
+      res.toListR(depth) ==
+      Helpers.toListR(elems, depth) ++ this.toListR(depth) &&
+      res.toListL(depth) ==
+      this.toListL(depth) ++ Helpers.toListL(elems, depth)
   )
 
   /// A wrapper around addR(Node[T], BigInt) that begins from the root of the tree
@@ -545,9 +562,10 @@ sealed trait FingerTree[T, M]:
 
     this.addR(Leaf(value), 0)
   }.ensuring(res =>
-    res.isWellFormed
-      && res.toListR(0) == value :: this.toListR(0)
-      && res.toListL(0) == this.toListL(0) :+ value
+    res.isWellFormed &&
+      res.toListR(0) == value :: this.toListR(0) &&
+      res.toListL(0) == this.toListL(0) :+ value &&
+      res.measure() == m(this.measure(), m(value))
   )
 
   /// Potentially gets "head" of left-ordered list represented by tree
@@ -569,9 +587,9 @@ sealed trait FingerTree[T, M]:
         }
     }
   }.ensuring(res =>
-    res.isDefined != this.isEmpty
-      && res == this.toListL().headOption
-      && res == this.toListR().lastOption
+    res.isDefined != this.isEmpty &&
+      res == this.toListL().headOption &&
+      res == this.toListR().lastOption
   )
 
   /// Potentially gets "tail" of left-ordered list represented by tree
@@ -587,12 +605,12 @@ sealed trait FingerTree[T, M]:
       case NilV() => None()
     }
   }.ensuring(res =>
-    res.isDefined != this.isEmpty
-      && (res match {
+    res.isDefined != this.isEmpty &&
+      (res match {
         case None() => true
         case Some(rest) =>
-          rest.isWellFormed
-          && rest.toListL() == this.toListL().tail
+          rest.isWellFormed &&
+          rest.toListL() == this.toListL().tail
       })
   )
 
@@ -624,14 +642,14 @@ sealed trait FingerTree[T, M]:
         }
     }
   }.ensuring(res =>
-    res.isEmpty == this.isEmpty
-      && (res match {
+    res.isEmpty == this.isEmpty &&
+      (res match {
         case NilV() => true
         case ConsV(head, rest) =>
-          rest.isWellFormed
-          && Some[T](head) == this.toListL().headOption
-          && Some[T](head) == this.toListR().lastOption
-          && rest.toListL() == this.toListL().tail
+          rest.isWellFormed &&
+          Some[T](head) == this.toListL().headOption &&
+          Some[T](head) == this.toListR().lastOption &&
+          rest.toListL() == this.toListL().tail
       })
   )
 
@@ -656,9 +674,9 @@ sealed trait FingerTree[T, M]:
         }
     }
   }.ensuring(res =>
-    res.isDefined != this.isEmpty
-      && res == this.toListR().headOption
-      && res == this.toListL().lastOption
+    res.isDefined != this.isEmpty &&
+      res == this.toListR().headOption &&
+      res == this.toListL().lastOption
   )
 
   /// Potentially gets "tail" of right-ordered list represented by tree,
@@ -675,12 +693,12 @@ sealed trait FingerTree[T, M]:
       case NilV() => None()
     }
   }.ensuring(res =>
-    res.isDefined != this.isEmpty
-      && (res match {
+    res.isDefined != this.isEmpty &&
+      (res match {
         case None() => true
         case Some(rest) =>
-          rest.isWellFormed
-          && rest.toListR() == this.toListR().tail
+          rest.isWellFormed &&
+          rest.toListR() == this.toListR().tail
       })
   )
 
@@ -710,14 +728,14 @@ sealed trait FingerTree[T, M]:
         }
     }
   }.ensuring(res =>
-    res.isEmpty == this.isEmpty
-      && (res match {
+    res.isEmpty == this.isEmpty &&
+      (res match {
         case NilV() => true
         case ConsV(head, rest) =>
-          rest.isWellFormed
-          && Some[T](head) == this.toListR().headOption
-          && Some[T](head) == this.toListL().lastOption
-          && rest.toListR() == this.toListR().tail
+          rest.isWellFormed &&
+          Some[T](head) == this.toListR().headOption &&
+          Some[T](head) == this.toListL().lastOption &&
+          rest.toListR() == this.toListR().tail
       })
   )
 
@@ -730,8 +748,8 @@ sealed trait FingerTree[T, M]:
       case _       => false
     }
   }.ensuring(res =>
-    res == this.toListL(depth).isEmpty
-      && res == this.toListR(depth).isEmpty
+    res == this.toListL(depth).isEmpty &&
+      res == this.toListR(depth).isEmpty
   )
 
   /// A wrapper around isEmpty(BigInt) that begins from the root of the tree
@@ -740,8 +758,8 @@ sealed trait FingerTree[T, M]:
 
     this.isEmpty(0)
   }.ensuring(res =>
-    res == this.toListL().isEmpty
-      && res == this.toListR().isEmpty
+    res == this.toListL().isEmpty &&
+      res == this.toListR().isEmpty
   )
 
   /// ***3.3 CONCATENATION*** ///
@@ -754,11 +772,11 @@ sealed trait FingerTree[T, M]:
       depth: BigInt
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
     require(
-      depth >= 0
-        && m.isValid
-        && tree1.isWellFormed(depth)
-        && tree2.isWellFormed(depth)
-        && elems.forall(_.isWellFormed(depth))
+      depth >= 0 &&
+        m.isValid &&
+        tree1.isWellFormed(depth) &&
+        tree2.isWellFormed(depth) &&
+        elems.forall(_.isWellFormed(depth))
     )
     decreases(tree1)
 
@@ -885,11 +903,11 @@ sealed trait FingerTree[T, M]:
       }
     }
   }.ensuring(res =>
-    res.isWellFormed(depth)
-      && res.toListL(depth) == tree1.toListL(depth)
+    res.isWellFormed(depth) &&
+      res.toListL(depth) == tree1.toListL(depth)
       ++ Helpers.toListL(elems, depth)
-      ++ tree2.toListL(depth)
-      && res.toListR(depth) == tree2.toListR(depth)
+      ++ tree2.toListL(depth) &&
+      res.toListR(depth) == tree2.toListR(depth)
       ++ Helpers.toListR(elems, depth)
       ++ tree1.toListR(depth)
   )
@@ -903,9 +921,9 @@ sealed trait FingerTree[T, M]:
 
     concat(this, Nil(), tree, 0)
   }.ensuring(res =>
-    res.isWellFormed
-      && res.toListL() == this.toListL() ++ tree.toListL()
-      && res.toListR() == tree.toListR() ++ this.toListR()
+    res.isWellFormed &&
+      res.toListL() == this.toListL() ++ tree.toListL() &&
+      res.toListR() == tree.toListR() ++ this.toListR()
   )
 
   /// Sets concatenation operator for finger trees to concat(FingerTree[T])
@@ -916,9 +934,9 @@ sealed trait FingerTree[T, M]:
 
     tree1.concat(tree2)
   }.ensuring(res =>
-    res.isWellFormed
-      && res.toListL() == tree1.toListL() ++ tree2.toListL()
-      && res.toListR() == tree2.toListR() ++ tree1.toListR()
+    res.isWellFormed &&
+      res.toListL() == tree1.toListL() ++ tree2.toListL() &&
+      res.toListR() == tree2.toListR() ++ tree1.toListR()
   )
 
   /// *** MEASURE *** ///

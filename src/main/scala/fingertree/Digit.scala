@@ -14,21 +14,25 @@ private sealed trait Digit[T, M]:
 
   /// ***INVARIANT AND PROOF HELPER FUNCTIONS*** ///
 
-  /// Applies a predicate to each segment of the digit
-  def forall(p: Node[T, M] => Boolean): Boolean = {
-    this match
-      case Digit1(a)             => p(a)
-      case Digit2(a, b, _)       => p(a) && p(b)
-      case Digit3(a, b, c, _)    => p(a) && p(b) && p(c)
-      case Digit4(a, b, c, d, _) => p(a) && p(b) && p(c) && p(d)
-  }
-
   /// Checks the invariant that segment of the digit is a fully-balanced tree
   /// of the given depth
   def isWellFormed(depth: BigInt)(implicit m: Measure[T, M]): Boolean = {
     require(depth >= 0 && m.isValid)
 
-    this.forall(_.isWellFormed(depth))
+    this match {
+      case Digit1(a) => a.isWellFormed(depth)
+      case Digit2(a, b, measure) =>
+        a.isWellFormed(depth) && b.isWellFormed(depth) &&
+        measure == m(a.measure(), b.measure())
+      case Digit3(a, b, c, measure) =>
+        a.isWellFormed(depth) && b.isWellFormed(depth) &&
+        c.isWellFormed(depth) &&
+        measure == m(a.measure(), b.measure(), c.measure())
+      case Digit4(a, b, c, d, measure) =>
+        a.isWellFormed(depth) && b.isWellFormed(depth) &&
+        c.isWellFormed(depth) && d.isWellFormed(depth) &&
+        measure == m(a.measure(), b.measure(), c.measure(), d.measure())
+    }
   }
 
   /// ***CONVERSION AND HELPER FUNCTIONS*** ///
@@ -56,8 +60,8 @@ private sealed trait Digit[T, M]:
       case Digit4(_, _, _, d, _) => d
     }
   }.ensuring(res =>
-    res.isWellFormed(depth)
-      && res == this.toNodeList(depth).last
+    res.isWellFormed(depth) &&
+      res == this.toNodeList(depth).last
   )
 
   /// Produces a new digit with all the segments of the original except for the first
@@ -102,16 +106,16 @@ private sealed trait Digit[T, M]:
       }
     }
   }.ensuring(res =>
-    !res.isEmpty
-      && res.forall(_.isWellFormed(depth))
-      && res == (this match {
+    !res.isEmpty &&
+      res.forall(_.isWellFormed(depth)) &&
+      res == (this match {
         case Digit1(a)             => List[Node[T, M]](a)
         case Digit2(a, b, _)       => List[Node[T, M]](a, b)
         case Digit3(a, b, c, _)    => List[Node[T, M]](a, b, c)
         case Digit4(a, b, c, d, _) => List[Node[T, M]](a, b, c, d)
-      })
-      && Helpers.toListL(res, depth) == this.toListL(depth)
-      && Helpers.toListR(res, depth) == this.toListR(depth)
+      }) &&
+      Helpers.toListL(res, depth) == this.toListL(depth) &&
+      Helpers.toListR(res, depth) == this.toListR(depth)
   )
 
   /// Constructs a list from a node, according to an in-order traversal
@@ -161,8 +165,8 @@ private sealed trait Digit[T, M]:
       }
     }
   }.ensuring(res =>
-    !res.isEmpty
-      && res.reverse == this.toListR(depth)
+    !res.isEmpty &&
+      res.reverse == this.toListR(depth)
   )
 
   /// Constructs a list from a node, according to a reversed in-order traversal
@@ -220,10 +224,10 @@ private sealed trait Digit[T, M]:
       }
     }
   }.ensuring(res =>
-    res.isWellFormed(depth)
-      && !res.isEmpty(depth)
-      && res.toListL(depth) == this.toListL(depth)
-      && res.toListR(depth) == this.toListR(depth)
+    res.isWellFormed(depth) &&
+      !res.isEmpty(depth) &&
+      res.toListL(depth) == this.toListL(depth) &&
+      res.toListR(depth) == this.toListR(depth)
   )
 
   def measure()(implicit m: Measure[T, M]): M = {

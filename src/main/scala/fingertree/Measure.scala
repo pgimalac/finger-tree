@@ -9,6 +9,8 @@ trait Measure[T, M] {
 
   def apply(c: T): M
 
+  /// *** APPLY ON MEASURE *** ///
+
   def apply(a: M, b: M): M
 
   final def apply(a: M, b: M, c: M): M =
@@ -16,6 +18,8 @@ trait Measure[T, M] {
 
   final def apply(a: M, b: M, c: M, d: M): M =
     this(this(this(a, b), c), d)
+
+  /// *** PROPERTIES *** ///
 
   final def isAssociative: Boolean =
     forall((x: M, y: M, z: M) => this(this(x, y), z) == this(x, this(y, z)))
