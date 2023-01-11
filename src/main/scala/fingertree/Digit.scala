@@ -10,7 +10,7 @@ import stainless.proof._
 /// call segments, to make operations on the finger tree simpler. The case classes
 /// of Digit[T] are found at the end of the file.
 
-private sealed trait Digit[T, M]:
+private sealed trait Digit[T, M] extends Measured[T, M]:
 
   /// ***INVARIANT AND PROOF HELPER FUNCTIONS*** ///
 
@@ -68,9 +68,9 @@ private sealed trait Digit[T, M]:
       case Digit1(_)       => None()
       case Digit2(_, b, _) => Some(Digit1(b))
       case Digit3(_, b, c, _) =>
-        Some(Digit2(b, c, m(b.measure(), c.measure())))
+        Some(Digit2(b, c, m(b, c)))
       case Digit4(_, b, c, d, _) =>
-        Some(Digit3(b, c, d, m(b.measure(), c.measure(), d.measure())))
+        Some(Digit3(b, c, d, m(b, c, d)))
     }
   }.ensuring(res => res.forall(_.isWellFormed(depth)))
 
@@ -82,9 +82,9 @@ private sealed trait Digit[T, M]:
       case Digit1(_)       => None()
       case Digit2(a, _, _) => Some(Digit1(a))
       case Digit3(a, b, _, _) =>
-        Some(Digit2(a, b, m(a.measure(), b.measure())))
+        Some(Digit2(a, b, m(a, b)))
       case Digit4(a, b, c, _, _) =>
-        Some(Digit3(a, b, c, m(a.measure(), b.measure(), c.measure())))
+        Some(Digit3(a, b, c, m(a, b, c)))
     }
   }.ensuring(res => res.forall(_.isWellFormed(depth)))
 
@@ -194,7 +194,7 @@ private sealed trait Digit[T, M]:
           a.toListR(depth)
         )
 
-        val newPrefix = Digit2(a, b, m(a.measure(), b.measure()))
+        val newPrefix = Digit2(a, b, m(a, b))
         Deep(newPrefix, Empty(), Digit1(c), measure)
       }
       case Digit4(a, b, c, d, measure) => {
@@ -212,9 +212,9 @@ private sealed trait Digit[T, M]:
         )
 
         Deep(
-          Digit2(a, b, m(a.measure(), b.measure())),
+          Digit2(a, b, m(a, b)),
           Empty(),
-          Digit2(c, d, m(c.measure(), d.measure())),
+          Digit2(c, d, m(c, d)),
           measure
         )
       }

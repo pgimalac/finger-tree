@@ -9,7 +9,7 @@ import stainless.proof._
 /// for finger trees that the original polymorphically recursive type would have.
 /// The case classes of Node[T] are found at the end of the file.
 
-sealed trait Node[T, M]:
+private sealed trait Node[T, M] extends Measured[T, M]:
 
   /// ***INVARIANT FUNCTIONS*** ///
 

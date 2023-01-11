@@ -57,7 +57,7 @@ object Helpers {
       case Nil()          => ???
       case Cons(a, Nil()) => ???
       case Cons(a, Cons(b, Nil())) =>
-        List(Node2(a, b, m(a.measure(), b.measure())))
+        List(Node2(a, b, m(a, b)))
       case Cons(a, Cons(b, Cons(c, Nil()))) =>
         ListLemmas.associativeConcat(
           a.toListL(depth),
@@ -65,7 +65,7 @@ object Helpers {
           c.toListL(depth)
         )
         List[Node[T, M]](
-          Node3(a, b, c, m(a.measure(), b.measure(), c.measure()))
+          Node3(a, b, c, m(a, b, c))
         )
       case Cons(a, Cons(b, Cons(c, Cons(d, Nil())))) =>
         ListLemmas.associativeConcat(
@@ -89,8 +89,8 @@ object Helpers {
             d.toListR(depth) ++ c.toListR(depth)
         )
         List[Node[T, M]](
-          Node2(a, b, m(a.measure(), b.measure())),
-          Node2(c, d, m(c.measure(), d.measure()))
+          Node2(a, b, m(a, b)),
+          Node2(c, d, m(c, d))
         )
       case Cons(a, Cons(b, Cons(c, tail))) => {
         ListLemmas.associativeConcat(
@@ -106,7 +106,7 @@ object Helpers {
           a.toListR(depth)
         )
         Cons(
-          Node3(a, b, c, m(a.measure(), b.measure(), c.measure())),
+          Node3(a, b, c, m(a, b, c)),
           toNodes(tail, depth)
         )
       }
@@ -138,7 +138,7 @@ object Helpers {
           digit,
           spine,
           suffix,
-          m(digit.measure(), spine.measure(), suffix.measure())
+          m(digit, spine, suffix)
         )
       case None() =>
         spine match {
@@ -148,7 +148,7 @@ object Helpers {
               value.toDigit(depth + 1),
               Empty(),
               suffix,
-              m(value.measure(), suffix.measure())
+              m(value, suffix)
             )
           case Deep(spinePrefix, spineSpine, spineSuffix, _) =>
             val prefix = spinePrefix.tailL(depth + 1) match {
@@ -174,7 +174,7 @@ object Helpers {
               newPrefix,
               newSpine,
               suffix,
-              m(newPrefix.measure(), newSpine.measure(), suffix.measure())
+              m(newPrefix, newSpine, suffix)
             )
         }
     }
@@ -211,7 +211,7 @@ object Helpers {
           prefix,
           spine,
           digit,
-          m(prefix.measure(), spine.measure(), digit.measure())
+          m(prefix, spine, digit)
         )
       case None() =>
         spine match {
@@ -221,7 +221,7 @@ object Helpers {
               prefix,
               Empty(),
               value.toDigit(depth + 1),
-              m(prefix.measure(), value.measure())
+              m(prefix, value)
             )
           case Deep(spinePrefix, spineSpine, spineSuffix, _) =>
             val suffix = spineSuffix.tailR(depth + 1) match {
@@ -247,7 +247,7 @@ object Helpers {
               prefix,
               newSpine,
               newSuffix,
-              m(prefix.measure(), newSpine.measure(), newSuffix.measure())
+              m(prefix, newSpine, newSuffix)
             )
         }
     }
