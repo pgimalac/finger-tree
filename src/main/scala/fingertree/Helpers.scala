@@ -12,7 +12,12 @@ object Helpers {
   def toListL[T, M](elems: List[Node[T, M]], depth: BigInt)(implicit
       m: Measure[T, M]
   ): List[T] = {
-    require(depth >= 0 && elems.forall(_.isWellFormed(depth)))
+    require(
+      depth >= 0
+        && m.isValid
+        && elems.forall(_.isWellFormed(depth))
+    )
+
     elems match {
       case Cons(head, tail) =>
         ListLemmas.reverseConcat(head.toListL(depth), toListL(tail, depth))
@@ -25,7 +30,12 @@ object Helpers {
   def toListR[T, M](elems: List[Node[T, M]], depth: BigInt)(implicit
       m: Measure[T, M]
   ): List[T] = {
-    require(depth >= 0 && elems.forall(_.isWellFormed(depth)))
+    require(
+      depth >= 0
+        && m.isValid
+        && elems.forall(_.isWellFormed(depth))
+    )
+
     elems match {
       case Cons(head, tail) => toListR(tail, depth) ++ head.toListR(depth)
       case Nil()            => Nil()
@@ -39,8 +49,10 @@ object Helpers {
     require(
       depth >= 0
         && elems.size >= 2
+        && m.isValid
         && elems.forall(_.isWellFormed(depth))
     )
+
     elems match {
       case Nil()                   => ???
       case Cons(a, Nil())          => ???
@@ -105,10 +117,12 @@ object Helpers {
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
     require(
       depth >= 0
+        && m.isValid
         && spine.isWellFormed(depth + 1)
         && prefixTail.forall(_.isWellFormed(depth))
         && suffix.isWellFormed(depth)
     )
+
     prefixTail match {
       case Some(digit) =>
         Deep(digit, spine, suffix)
@@ -161,10 +175,12 @@ object Helpers {
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
     require(
       depth >= 0
+        && m.isValid
         && spine.isWellFormed(depth + 1)
         && prefix.isWellFormed(depth)
         && suffixTail.forall(_.isWellFormed(depth))
     )
+
     suffixTail match {
       case Some(digit) => Deep(prefix, spine, digit)
       case None() =>

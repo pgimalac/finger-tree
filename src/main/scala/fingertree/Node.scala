@@ -15,7 +15,7 @@ sealed trait Node[T, M]:
 
   /// Checks the invariant that the node is a fully-balanced tree of the given depth
   def isWellFormed(depth: BigInt)(implicit m: Measure[T, M]): Boolean = {
-    require(depth >= 0)
+    require(depth >= 0 && m.isValid)
 
     this match {
       case Leaf(a) => depth == 0
@@ -35,7 +35,7 @@ sealed trait Node[T, M]:
 
   /// Constructs a list from a node, according to an in-order traversal
   def toListL(depth: BigInt)(implicit m: Measure[T, M]): List[T] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Leaf(a) => List(a)
@@ -73,7 +73,7 @@ sealed trait Node[T, M]:
 
   /// Constructs a list from a node, according to a reversed in-order traversal
   def toListR(depth: BigInt)(implicit m: Measure[T, M]): List[T] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Leaf(a) => List(a)
@@ -87,7 +87,7 @@ sealed trait Node[T, M]:
 
   /// Constructs a digit from a node, using each branch as an element in the digit
   def toDigit(depth: BigInt)(implicit m: Measure[T, M]): Digit[T, M] = {
-    require(depth >= 1 && this.isWellFormed(depth))
+    require(depth >= 1 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Leaf(_)                    => ??? // Should never get here

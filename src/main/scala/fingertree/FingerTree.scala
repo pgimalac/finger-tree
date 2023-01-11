@@ -17,7 +17,7 @@ sealed trait FingerTree[T, M]:
   /// Checks the invariant that the tree is composed of fully balanced
   /// subtrees of increasing depth at each progressive level
   def isWellFormed(depth: BigInt)(implicit m: Measure[T, M]): Boolean = {
-    require(depth >= 0)
+    require(depth >= 0 && m.isValid)
 
     this match {
       case Empty()       => true
@@ -31,8 +31,10 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around isWellFormed(BigInt), starting the check from the
   /// top-most level of the tree
-  def isWellFormed(implicit m: Measure[T, M]): Boolean =
+  def isWellFormed(implicit m: Measure[T, M]): Boolean = {
+    require(m.isValid)
     this.isWellFormed(0)
+  }
 
   /// ***CONVERSION FUNCTIONS*** ///
 
@@ -41,6 +43,8 @@ sealed trait FingerTree[T, M]:
   def toTreeL[T, M](
       elems: List[T]
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
+    require(m.isValid)
+
     elems match {
       case Nil()      => Empty()
       case Cons(h, t) => toTreeL(t).addL(h)
@@ -54,6 +58,8 @@ sealed trait FingerTree[T, M]:
   def toTreeR[T, M](
       elems: List[T]
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
+    require(m.isValid)
+
     elems match {
       case Nil()      => Empty()
       case Cons(h, t) => toTreeR(t).addR(h)
@@ -65,7 +71,7 @@ sealed trait FingerTree[T, M]:
 
   /// Constructs a list from a tree, according to an in-order traversal
   def toListL(depth: BigInt)(implicit m: Measure[T, M]): List[T] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Empty()   => Nil()
@@ -93,14 +99,14 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around toListL(BigInt), starting from the top-most level of the tree
   def toListL()(implicit m: Measure[T, M]): List[T] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this.toListL(0)
   }.ensuring(res => res.reverse == this.toListR())
 
   /// Constructs a list from a tree, according to a reversed in-order traversal
   def toListR(depth: BigInt)(implicit m: Measure[T, M]): List[T] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Empty()   => Nil()
@@ -113,7 +119,7 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around toListR(BigInt), starting from the top-most level of the tree
   def toListR()(implicit m: Measure[T, M]): List[T] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this.toListR(0)
   }
@@ -124,7 +130,12 @@ sealed trait FingerTree[T, M]:
   private def addL(value: Node[T, M], depth: BigInt)(implicit
       m: Measure[T, M]
   ): FingerTree[T, M] = {
-    require(depth >= 0 && this.isWellFormed(depth) && value.isWellFormed(depth))
+    require(
+      depth >= 0
+        && m.isValid
+        && this.isWellFormed(depth)
+        && value.isWellFormed(depth)
+    )
 
     this match {
       case Empty() => Single(value)
@@ -246,6 +257,7 @@ sealed trait FingerTree[T, M]:
   ): FingerTree[T, M] = {
     require(
       depth >= 0
+        && m.isValid
         && this.isWellFormed(depth)
         && elems.forall(_.isWellFormed(depth))
     )
@@ -277,7 +289,7 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around addL(Node[T], BigInt) that begins from the root of the tree
   def addL(value: T)(implicit m: Measure[T, M]): FingerTree[T, M] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this.addL(Leaf(value), 0)
   }.ensuring(res =>
@@ -290,7 +302,12 @@ sealed trait FingerTree[T, M]:
   private def addR(value: Node[T, M], depth: BigInt)(implicit
       m: Measure[T, M]
   ): FingerTree[T, M] = {
-    require(depth >= 0 && this.isWellFormed(depth) && value.isWellFormed(depth))
+    require(
+      depth >= 0
+        && m.isValid
+        && this.isWellFormed(depth)
+        && value.isWellFormed(depth)
+    )
 
     this match {
       case Empty() => Single(value)
@@ -412,6 +429,7 @@ sealed trait FingerTree[T, M]:
   ): FingerTree[T, M] = {
     require(
       depth >= 0
+        && m.isValid
         && this.isWellFormed(depth)
         && elems.forall(_.isWellFormed(depth))
     )
@@ -443,7 +461,7 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around addR(Node[T], BigInt) that begins from the root of the tree
   def addR(value: T)(implicit m: Measure[T, M]): FingerTree[T, M] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this.addR(Leaf(value), 0)
   }.ensuring(res =>
@@ -454,7 +472,7 @@ sealed trait FingerTree[T, M]:
 
   /// Potentially gets "head" of left-ordered list represented by tree
   def headL(implicit m: Measure[T, M]): Option[T] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this match {
       case Empty()         => None[T]()
@@ -478,7 +496,7 @@ sealed trait FingerTree[T, M]:
 
   /// Potentially gets "tail" of left-ordered list represented by tree
   def tailL(implicit m: Measure[T, M]): Option[FingerTree[T, M]] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this.viewL match {
       case ConsV(_, rest) => {
@@ -500,7 +518,7 @@ sealed trait FingerTree[T, M]:
 
   /// Splits a tree into its leftmost element and the rest of the tree
   def viewL(implicit m: Measure[T, M]): View[T, M] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this match {
       case Empty()             => NilV()
@@ -540,7 +558,7 @@ sealed trait FingerTree[T, M]:
   /// Potentially gets "head" of right-ordered list represented by tree,
   /// i.e. last element of left-ordered list represented by tree
   def headR(implicit m: Measure[T, M]): Option[T] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this match {
       case Empty()         => None()
@@ -566,7 +584,7 @@ sealed trait FingerTree[T, M]:
   /// Potentially gets "tail" of right-ordered list represented by tree,
   /// i.e. all except the last element of left-ordered list represented by tree
   def tailR(implicit m: Measure[T, M]): Option[FingerTree[T, M]] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this.viewR match {
       case ConsV(_, rest) => {
@@ -588,7 +606,7 @@ sealed trait FingerTree[T, M]:
 
   /// Splits a tree into its rightmost element and the rest of the tree
   def viewR(implicit m: Measure[T, M]): View[T, M] = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this match {
       case Empty()             => NilV()
@@ -625,7 +643,7 @@ sealed trait FingerTree[T, M]:
 
   /// Determines if the tree is empty
   def isEmpty(depth: BigInt)(implicit m: Measure[T, M]): Boolean = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Empty() => true
@@ -638,7 +656,7 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around isEmpty(BigInt) that begins from the root of the tree
   def isEmpty(implicit m: Measure[T, M]): Boolean = {
-    require(this.isWellFormed)
+    require(m.isValid && this.isWellFormed)
 
     this.isEmpty(0)
   }.ensuring(res =>
@@ -657,6 +675,7 @@ sealed trait FingerTree[T, M]:
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
     require(
       depth >= 0
+        && m.isValid
         && tree1.isWellFormed(depth)
         && tree2.isWellFormed(depth)
         && elems.forall(_.isWellFormed(depth))
@@ -791,7 +810,7 @@ sealed trait FingerTree[T, M]:
   def concat(
       tree: FingerTree[T, M]
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
-    require(this.isWellFormed && tree.isWellFormed)
+    require(m.isValid && this.isWellFormed && tree.isWellFormed)
 
     concat(this, Nil(), tree, 0)
   }.ensuring(res =>
@@ -804,7 +823,7 @@ sealed trait FingerTree[T, M]:
   def ++[T, M](tree1: FingerTree[T, M], tree2: FingerTree[T, M])(implicit
       m: Measure[T, M]
   ): FingerTree[T, M] = {
-    require(tree1.isWellFormed && tree2.isWellFormed)
+    require(m.isValid && tree1.isWellFormed && tree2.isWellFormed)
 
     tree1.concat(tree2)
   }.ensuring(res =>

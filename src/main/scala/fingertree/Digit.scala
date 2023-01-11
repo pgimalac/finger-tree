@@ -15,14 +15,7 @@ private sealed trait Digit[T, M]:
   /// ***INVARIANT AND PROOF HELPER FUNCTIONS*** ///
 
   /// Applies a predicate to each segment of the digit
-  def forall(p: Node[T, M] => Boolean)(implicit m: Measure[T, M]): Boolean = {
-    this match {
-      case Digit1(a)          => p(a)
-      case Digit2(a, b)       => p(a) && p(b)
-      case Digit3(a, b, c)    => p(a) && p(b) && p(c)
-      case Digit4(a, b, c, d) => p(a) && p(b) && p(c) && p(d)
-    }
-
+  def forall(p: Node[T, M] => Boolean): Boolean = {
     this match
       case Digit1(a)          => p(a)
       case Digit2(a, b)       => p(a) && p(b)
@@ -33,7 +26,7 @@ private sealed trait Digit[T, M]:
   /// Checks the invariant that segment of the digit is a fully-balanced tree
   /// of the given depth
   def isWellFormed(depth: BigInt)(implicit m: Measure[T, M]): Boolean = {
-    require(depth >= 0)
+    require(depth >= 0 && m.isValid)
 
     this.forall(_.isWellFormed(depth))
   }
@@ -42,7 +35,7 @@ private sealed trait Digit[T, M]:
 
   /// Gets first segment in a digit
   def headL(depth: BigInt)(implicit m: Measure[T, M]): Node[T, M] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Digit1(a)          => a
@@ -54,7 +47,7 @@ private sealed trait Digit[T, M]:
 
   /// Gets last segment in a digit
   def headR(depth: BigInt)(implicit m: Measure[T, M]): Node[T, M] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Digit1(a)          => a
@@ -69,7 +62,7 @@ private sealed trait Digit[T, M]:
 
   /// Produces a new digit with all the segments of the original except for the first
   def tailL(depth: BigInt)(implicit m: Measure[T, M]): Option[Digit[T, M]] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Digit1(_)          => None()
@@ -81,7 +74,7 @@ private sealed trait Digit[T, M]:
 
   /// Produces a new digit with all the segments of the original except for the last
   def tailR(depth: BigInt)(implicit m: Measure[T, M]): Option[Digit[T, M]] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Digit1(_)          => None()
@@ -93,7 +86,7 @@ private sealed trait Digit[T, M]:
 
   /// Converts a digit to a list of Node[T]'s, for easier proof ergonomics
   def toNodeList(depth: BigInt)(implicit m: Measure[T, M]): List[Node[T, M]] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
     decreases(this)
 
     this.tailL(depth) match {
@@ -119,7 +112,7 @@ private sealed trait Digit[T, M]:
 
   /// Constructs a list from a node, according to an in-order traversal
   def toListL(depth: BigInt)(implicit m: Measure[T, M]): List[T] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Digit1(a) => a.toListL(depth)
@@ -170,7 +163,7 @@ private sealed trait Digit[T, M]:
 
   /// Constructs a list from a node, according to a reversed in-order traversal
   def toListR(depth: BigInt)(implicit m: Measure[T, M]): List[T] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Digit1(a)    => a.toListR(depth)
@@ -185,7 +178,7 @@ private sealed trait Digit[T, M]:
 
   /// Constructs a simple one-level finger tree from a digit
   def toTree(depth: BigInt)(implicit m: Measure[T, M]): FingerTree[T, M] = {
-    require(depth >= 0 && this.isWellFormed(depth))
+    require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
       case Digit1(a)    => Single(a)
