@@ -22,7 +22,7 @@ sealed trait FingerTree[T, M]:
     this match {
       case Empty()       => true
       case Single(value) => value.isWellFormed(depth)
-      case Deep(prefix, spine, suffix) =>
+      case Deep(prefix, spine, suffix, _) =>
         prefix.isWellFormed(depth)
         && spine.isWellFormed(depth + 1)
         && suffix.isWellFormed(depth)
@@ -76,7 +76,7 @@ sealed trait FingerTree[T, M]:
     this match {
       case Empty()   => Nil()
       case Single(a) => a.toListL(depth)
-      case Deep(prefix, spine, suffix) => {
+      case Deep(prefix, spine, suffix, _) => {
         ListLemmas.reverseConcat(
           prefix.toListL(depth),
           spine.toListL(depth + 1)
@@ -111,7 +111,7 @@ sealed trait FingerTree[T, M]:
     this match {
       case Empty()   => Nil()
       case Single(a) => a.toListR(depth)
-      case Deep(prefix, spine, suffix) =>
+      case Deep(prefix, spine, suffix, _) =>
         suffix.toListR(depth) ++ spine.toListR(depth + 1)
           ++ prefix.toListR(depth)
     }
@@ -140,8 +140,13 @@ sealed trait FingerTree[T, M]:
     this match {
       case Empty() => Single(value)
       case Single(existingValue) =>
-        Deep(Digit1(value), Empty(), Digit1(existingValue))
-      case Deep(Digit1(a), spine, suffix) => {
+        Deep(
+          Digit1(value),
+          Empty(),
+          Digit1(existingValue),
+          m(value.measure(), existingValue.measure())
+        )
+      case Deep(Digit1(a), spine, suffix, _) => {
         ListLemmas.associativeConcat(
           value.toListL(depth),
           a.toListL(depth),
@@ -154,9 +159,15 @@ sealed trait FingerTree[T, M]:
           value.toListR(depth)
         )
 
-        Deep(Digit2(value, a), spine, suffix)
+        val newPrefix = Digit2(value, a, m(value.measure(), a.measure()))
+        Deep(
+          newPrefix,
+          spine,
+          suffix,
+          m(newPrefix.measure(), spine.measure(), suffix.measure())
+        )
       }
-      case Deep(Digit2(a, b), spine, suffix) => {
+      case Deep(Digit2(a, b, _), spine, suffix, _) => {
         ListLemmas.associativeConcat(
           value.toListL(depth),
           a.toListL(depth),
@@ -175,9 +186,16 @@ sealed trait FingerTree[T, M]:
           value.toListR(depth)
         )
 
-        Deep(Digit3(value, a, b), spine, suffix)
+        val newPrefix =
+          Digit3(value, a, b, m(value.measure(), a.measure(), b.measure()))
+        Deep(
+          newPrefix,
+          spine,
+          suffix,
+          m(newPrefix.measure(), spine.measure(), suffix.measure())
+        )
       }
-      case Deep(Digit3(a, b, c), spine, suffix) => {
+      case Deep(Digit3(a, b, c, _), spine, suffix, _) => {
         ListLemmas.associativeConcat(
           value.toListL(depth),
           a.toListL(depth),
@@ -202,9 +220,21 @@ sealed trait FingerTree[T, M]:
           value.toListR(depth)
         )
 
-        Deep(Digit4(value, a, b, c), spine, suffix)
+        val newPrefix = Digit4(
+          value,
+          a,
+          b,
+          c,
+          m(value.measure(), a.measure(), b.measure(), c.measure())
+        )
+        Deep(
+          newPrefix,
+          spine,
+          suffix,
+          m(newPrefix.measure(), spine.measure(), suffix.measure())
+        )
       }
-      case Deep(Digit4(a, b, c, d), spine, suffix) => {
+      case Deep(Digit4(a, b, c, d, _), spine, suffix, _) => {
         ListLemmas.associativeConcat(
           value.toListL(depth),
           a.toListL(depth) ++ b.toListL(depth)
@@ -242,7 +272,17 @@ sealed trait FingerTree[T, M]:
           value.toListR(depth)
         )
 
-        Deep(Digit2(value, a), spine.addL(Node3(b, c, d), depth + 1), suffix)
+        val newPrefix = Digit2(value, a, m(value.measure(), a.measure()))
+        val newSpine = spine.addL(
+          Node3(b, c, d, m(b.measure(), c.measure(), d.measure())),
+          depth + 1
+        )
+        Deep(
+          newPrefix,
+          newSpine,
+          suffix,
+          m(newPrefix.measure(), newSpine.measure(), suffix.measure())
+        )
       }
     }
   }.ensuring(res =>
@@ -312,8 +352,13 @@ sealed trait FingerTree[T, M]:
     this match {
       case Empty() => Single(value)
       case Single(existingValue) =>
-        Deep(Digit1(existingValue), Empty(), Digit1(value))
-      case Deep(prefix, spine, Digit1(a)) => {
+        Deep(
+          Digit1(existingValue),
+          Empty(),
+          Digit1(value),
+          m(existingValue.measure(), value.measure())
+        )
+      case Deep(prefix, spine, Digit1(a), _) => {
         ListLemmas.associativeConcat(
           value.toListR(depth),
           a.toListR(depth),
@@ -326,9 +371,15 @@ sealed trait FingerTree[T, M]:
           value.toListL(depth)
         )
 
-        Deep(prefix, spine, Digit2(a, value))
+        val newSuffix = Digit2(a, value, m(a.measure(), value.measure()))
+        Deep(
+          prefix,
+          spine,
+          newSuffix,
+          m(prefix.measure(), spine.measure(), newSuffix.measure())
+        )
       }
-      case Deep(prefix, spine, Digit2(a, b)) => {
+      case Deep(prefix, spine, Digit2(a, b, _), _) => {
         ListLemmas.associativeConcat(
           value.toListR(depth),
           b.toListR(depth),
@@ -347,9 +398,16 @@ sealed trait FingerTree[T, M]:
           value.toListL(depth)
         )
 
-        Deep(prefix, spine, Digit3(a, b, value))
+        val newSuffix =
+          Digit3(a, b, value, m(a.measure(), b.measure(), value.measure()))
+        Deep(
+          prefix,
+          spine,
+          newSuffix,
+          m(prefix.measure(), spine.measure(), newSuffix.measure())
+        )
       }
-      case Deep(prefix, spine, Digit3(a, b, c)) => {
+      case Deep(prefix, spine, Digit3(a, b, c, _), _) => {
         ListLemmas.associativeConcat(
           value.toListR(depth),
           c.toListR(depth),
@@ -374,9 +432,21 @@ sealed trait FingerTree[T, M]:
           value.toListL(depth)
         )
 
-        Deep(prefix, spine, Digit4(a, b, c, value))
+        val newSuffix = Digit4(
+          a,
+          b,
+          c,
+          value,
+          m(a.measure(), b.measure(), c.measure(), value.measure())
+        )
+        Deep(
+          prefix,
+          spine,
+          newSuffix,
+          m(prefix.measure(), spine.measure(), newSuffix.measure())
+        )
       }
-      case Deep(prefix, spine, Digit4(a, b, c, d)) => {
+      case Deep(prefix, spine, Digit4(a, b, c, d, _), _) => {
         ListLemmas.associativeConcat(
           value.toListR(depth),
           d.toListR(depth) ++ c.toListR(depth)
@@ -414,7 +484,17 @@ sealed trait FingerTree[T, M]:
           value.toListL(depth)
         )
 
-        Deep(prefix, spine.addR(Node3(a, b, c), depth + 1), Digit2(d, value))
+        val newSpine = spine.addR(
+          Node3(a, b, c, m(a.measure(), b.measure(), c.measure())),
+          depth + 1
+        )
+        val newSuffix = Digit2(d, value, m(d.measure(), value.measure()))
+        Deep(
+          prefix,
+          newSpine,
+          newSuffix,
+          m(prefix.measure(), newSpine.measure(), newSuffix.measure())
+        )
       }
     }
   }.ensuring(res =>
@@ -478,7 +558,7 @@ sealed trait FingerTree[T, M]:
       case Empty()         => None[T]()
       case Single(Leaf(e)) => Some(e)
       case Single(_)       => ??? // Should never get here
-      case Deep(prefix, spine, suffix) =>
+      case Deep(prefix, spine, suffix, _) =>
         prefix.headL(0) match {
           case Leaf(value) => {
             ListLemmas.reverseHead(this.toListL())
@@ -524,7 +604,7 @@ sealed trait FingerTree[T, M]:
       case Empty()             => NilV()
       case Single(Leaf(value)) => ConsV(value, Empty())
       case Single(_)           => ??? // Should never get here
-      case Deep(prefix, spine, suffix) =>
+      case Deep(prefix, spine, suffix, _) =>
         prefix.headL(0) match {
           case Leaf(value) => {
             check(this.headL == Some[T](value))
@@ -564,7 +644,7 @@ sealed trait FingerTree[T, M]:
       case Empty()         => None()
       case Single(Leaf(e)) => Some(e)
       case Single(_)       => ??? // Should never get here
-      case Deep(prefix, spine, suffix) =>
+      case Deep(prefix, spine, suffix, _) =>
         suffix.headR(0) match {
           case Leaf(value) => {
             ListLemmas.reverseHead(this.toListR())
@@ -612,7 +692,7 @@ sealed trait FingerTree[T, M]:
       case Empty()             => NilV()
       case Single(Leaf(value)) => ConsV(value, Empty())
       case Single(_)           => ??? // Should never get here
-      case Deep(prefix, spine, suffix) =>
+      case Deep(prefix, spine, suffix, _) =>
         suffix.headR(0) match {
           case Leaf(value) => {
             ListLemmas.tailConcat(suffix.toListR(0), spine.toListR(1))
@@ -703,7 +783,10 @@ sealed trait FingerTree[T, M]:
 
         tree1.addR(elems, depth).addR(e, depth)
       }
-      case (Deep(prefix1, spine1, suffix1), Deep(prefix2, spine2, suffix2)) => {
+      case (
+            Deep(prefix1, spine1, suffix1, _),
+            Deep(prefix2, spine2, suffix2, _)
+          ) => {
         val elemsTree1 = suffix1.toNodeList(depth)
         val elemsTree2 = prefix2.toNodeList(depth)
 
@@ -792,7 +875,13 @@ sealed trait FingerTree[T, M]:
         val elemsRec = elemsTree1 ++ elems ++ elemsTree2
         val newElems = Helpers.toNodes(elemsRec, depth)
 
-        Deep(prefix1, concat(spine1, newElems, spine2, depth + 1), suffix2)
+        val newSpine = concat(spine1, newElems, spine2, depth + 1)
+        Deep(
+          prefix1,
+          newSpine,
+          suffix2,
+          m.apply(prefix1.measure(), newSpine.measure(), suffix2.measure())
+        )
       }
     }
   }.ensuring(res =>
@@ -832,6 +921,18 @@ sealed trait FingerTree[T, M]:
       && res.toListR() == tree2.toListR() ++ tree1.toListR()
   )
 
+  /// *** MEASURE *** ///
+
+  def measure()(implicit m: Measure[T, M]): M = {
+    require(m.isValid)
+
+    this match {
+      case Empty()                => m.zero
+      case Single(value)          => value.measure()
+      case Deep(_, _, _, measure) => measure
+    }
+  }
+
 /// A FingerTree[T] is either a:
 /// - Empty[T](),
 /// - Single[T](Node[T]), or
@@ -841,5 +942,6 @@ final case class Single[T, M](value: Node[T, M]) extends FingerTree[T, M]
 final case class Deep[T, M](
     prefix: Digit[T, M],
     spine: FingerTree[T, M],
-    suffix: Digit[T, M]
+    suffix: Digit[T, M],
+    m: M
 ) extends FingerTree[T, M]

@@ -19,11 +19,11 @@ sealed trait Node[T, M]:
 
     this match {
       case Leaf(a) => depth == 0
-      case Node2(left, right) =>
+      case Node2(left, right, _) =>
         depth != 0
         && left.isWellFormed(depth - 1)
         && right.isWellFormed(depth - 1)
-      case Node3(left, middle, right) =>
+      case Node3(left, middle, right, _) =>
         depth != 0
         && left.isWellFormed(depth - 1)
         && middle.isWellFormed(depth - 1)
@@ -39,7 +39,7 @@ sealed trait Node[T, M]:
 
     this match {
       case Leaf(a) => List(a)
-      case Node2(left, right) => {
+      case Node2(left, right, _) => {
         ListLemmas.reverseConcat(
           left.toListL(depth - 1),
           right.toListL(depth - 1)
@@ -47,7 +47,7 @@ sealed trait Node[T, M]:
 
         left.toListL(depth - 1) ++ right.toListL(depth - 1)
       }
-      case Node3(left, middle, right) => {
+      case Node3(left, middle, right, _) => {
         ListLemmas.reverseConcat(
           left.toListL(depth - 1),
           middle.toListL(depth - 1)
@@ -77,9 +77,9 @@ sealed trait Node[T, M]:
 
     this match {
       case Leaf(a) => List(a)
-      case Node2(left, right) =>
+      case Node2(left, right, _) =>
         right.toListR(depth - 1) ++ left.toListR(depth - 1)
-      case Node3(left, middle, right) =>
+      case Node3(left, middle, right, _) =>
         right.toListR(depth - 1) ++ middle.toListR(depth - 1)
           ++ left.toListR(depth - 1)
     }
@@ -90,9 +90,10 @@ sealed trait Node[T, M]:
     require(depth >= 1 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Leaf(_)                    => ??? // Should never get here
-      case Node2(left, right)         => Digit2(left, right)
-      case Node3(left, middle, right) => Digit3(left, middle, right)
+      case Leaf(_)                     => ??? // Should never get here
+      case Node2(left, right, measure) => Digit2(left, right, measure)
+      case Node3(left, middle, right, measure) =>
+        Digit3(left, middle, right, measure)
     }
   }.ensuring(res =>
     res.isWellFormed(depth - 1)
@@ -100,15 +101,29 @@ sealed trait Node[T, M]:
       && res.toListR(depth - 1) == this.toListR(depth)
   )
 
+  def measure()(implicit m: Measure[T, M]): M = {
+    require(m.isValid)
+
+    this match {
+      case Leaf(a)                 => m(a)
+      case Node2(_, _, measure)    => measure
+      case Node3(_, _, _, measure) => measure
+    }
+  }
+
 /// A Node[T] is either a:
 /// - Leaf[T](T)
 /// - Node2[T](Node[T], Node[T]), or
 /// - Node3[T](Node[T], Node[T], Node[T])
 final case class Leaf[T, M](a: T) extends Node[T, M]
-final case class Node2[T, M](left: Node[T, M], right: Node[T, M])
-    extends Node[T, M]
+final case class Node2[T, M](
+    left: Node[T, M],
+    right: Node[T, M],
+    m: M
+) extends Node[T, M]
 final case class Node3[T, M](
     left: Node[T, M],
     middle: Node[T, M],
-    right: Node[T, M]
+    right: Node[T, M],
+    m: M
 ) extends Node[T, M]

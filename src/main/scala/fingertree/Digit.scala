@@ -17,10 +17,10 @@ private sealed trait Digit[T, M]:
   /// Applies a predicate to each segment of the digit
   def forall(p: Node[T, M] => Boolean): Boolean = {
     this match
-      case Digit1(a)          => p(a)
-      case Digit2(a, b)       => p(a) && p(b)
-      case Digit3(a, b, c)    => p(a) && p(b) && p(c)
-      case Digit4(a, b, c, d) => p(a) && p(b) && p(c) && p(d)
+      case Digit1(a)             => p(a)
+      case Digit2(a, b, _)       => p(a) && p(b)
+      case Digit3(a, b, c, _)    => p(a) && p(b) && p(c)
+      case Digit4(a, b, c, d, _) => p(a) && p(b) && p(c) && p(d)
   }
 
   /// Checks the invariant that segment of the digit is a fully-balanced tree
@@ -38,10 +38,10 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(a)          => a
-      case Digit2(a, _)       => a
-      case Digit3(a, _, _)    => a
-      case Digit4(a, _, _, _) => a
+      case Digit1(a)             => a
+      case Digit2(a, _, _)       => a
+      case Digit3(a, _, _, _)    => a
+      case Digit4(a, _, _, _, _) => a
     }
   }.ensuring(res => res.isWellFormed(depth))
 
@@ -50,10 +50,10 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(a)          => a
-      case Digit2(_, b)       => b
-      case Digit3(_, _, c)    => c
-      case Digit4(_, _, _, d) => d
+      case Digit1(a)             => a
+      case Digit2(_, b, _)       => b
+      case Digit3(_, _, c, _)    => c
+      case Digit4(_, _, _, d, _) => d
     }
   }.ensuring(res =>
     res.isWellFormed(depth)
@@ -65,10 +65,12 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(_)          => None()
-      case Digit2(_, b)       => Some(Digit1(b))
-      case Digit3(_, b, c)    => Some(Digit2(b, c))
-      case Digit4(_, b, c, d) => Some(Digit3(b, c, d))
+      case Digit1(_)       => None()
+      case Digit2(_, b, _) => Some(Digit1(b))
+      case Digit3(_, b, c, _) =>
+        Some(Digit2(b, c, m(b.measure(), c.measure())))
+      case Digit4(_, b, c, d, _) =>
+        Some(Digit3(b, c, d, m(b.measure(), c.measure(), d.measure())))
     }
   }.ensuring(res => res.forall(_.isWellFormed(depth)))
 
@@ -77,10 +79,12 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(_)          => None()
-      case Digit2(a, _)       => Some(Digit1(a))
-      case Digit3(a, b, _)    => Some(Digit2(a, b))
-      case Digit4(a, b, c, _) => Some(Digit3(a, b, c))
+      case Digit1(_)       => None()
+      case Digit2(a, _, _) => Some(Digit1(a))
+      case Digit3(a, b, _, _) =>
+        Some(Digit2(a, b, m(a.measure(), b.measure())))
+      case Digit4(a, b, c, _, _) =>
+        Some(Digit3(a, b, c, m(a.measure(), b.measure(), c.measure())))
     }
   }.ensuring(res => res.forall(_.isWellFormed(depth)))
 
@@ -101,10 +105,10 @@ private sealed trait Digit[T, M]:
     !res.isEmpty
       && res.forall(_.isWellFormed(depth))
       && res == (this match {
-        case Digit1(a)          => List[Node[T, M]](a)
-        case Digit2(a, b)       => List[Node[T, M]](a, b)
-        case Digit3(a, b, c)    => List[Node[T, M]](a, b, c)
-        case Digit4(a, b, c, d) => List[Node[T, M]](a, b, c, d)
+        case Digit1(a)             => List[Node[T, M]](a)
+        case Digit2(a, b, _)       => List[Node[T, M]](a, b)
+        case Digit3(a, b, c, _)    => List[Node[T, M]](a, b, c)
+        case Digit4(a, b, c, d, _) => List[Node[T, M]](a, b, c, d)
       })
       && Helpers.toListL(res, depth) == this.toListL(depth)
       && Helpers.toListR(res, depth) == this.toListR(depth)
@@ -116,12 +120,12 @@ private sealed trait Digit[T, M]:
 
     this match {
       case Digit1(a) => a.toListL(depth)
-      case Digit2(a, b) => {
+      case Digit2(a, b, _) => {
         ListLemmas.reverseConcat(a.toListL(depth), b.toListL(depth))
 
         a.toListL(depth) ++ b.toListL(depth)
       }
-      case Digit3(a, b, c) => {
+      case Digit3(a, b, c, _) => {
         ListLemmas.reverseConcat(a.toListL(depth), b.toListL(depth))
         ListLemmas.reverseConcat(
           a.toListL(depth) ++ b.toListL(depth),
@@ -135,7 +139,7 @@ private sealed trait Digit[T, M]:
 
         a.toListL(depth) ++ b.toListL(depth) ++ c.toListL(depth)
       }
-      case Digit4(a, b, c, d) => {
+      case Digit4(a, b, c, d, _) => {
         ListLemmas.reverseConcat(a.toListL(depth), b.toListL(depth))
         ListLemmas.reverseConcat(
           a.toListL(depth) ++ b.toListL(depth),
@@ -166,11 +170,11 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(a)    => a.toListR(depth)
-      case Digit2(a, b) => b.toListR(depth) ++ a.toListR(depth)
-      case Digit3(a, b, c) =>
+      case Digit1(a)       => a.toListR(depth)
+      case Digit2(a, b, _) => b.toListR(depth) ++ a.toListR(depth)
+      case Digit3(a, b, c, _) =>
         c.toListR(depth) ++ b.toListR(depth) ++ a.toListR(depth)
-      case Digit4(a, b, c, d) =>
+      case Digit4(a, b, c, d, _) =>
         d.toListR(depth) ++ c.toListR(depth)
           ++ b.toListR(depth) ++ a.toListR(depth)
     }
@@ -181,18 +185,19 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(a)    => Single(a)
-      case Digit2(a, b) => Deep(Digit1(a), Empty(), Digit1(b))
-      case Digit3(a, b, c) => {
+      case Digit1(a)             => Single(a)
+      case Digit2(a, b, measure) => Deep(Digit1(a), Empty(), Digit1(b), measure)
+      case Digit3(a, b, c, measure) => {
         ListLemmas.associativeConcat(
           c.toListR(depth),
           b.toListR(depth),
           a.toListR(depth)
         )
 
-        Deep(Digit2(a, b), Empty(), Digit1(c))
+        val newPrefix = Digit2(a, b, m(a.measure(), b.measure()))
+        Deep(newPrefix, Empty(), Digit1(c), measure)
       }
-      case Digit4(a, b, c, d) => {
+      case Digit4(a, b, c, d, measure) => {
         ListLemmas.associativeConcat(
           a.toListL(depth),
           b.toListL(depth),
@@ -206,7 +211,12 @@ private sealed trait Digit[T, M]:
           a.toListR(depth)
         )
 
-        Deep(Digit2(a, b), Empty(), Digit2(c, d))
+        Deep(
+          Digit2(a, b, m(a.measure(), b.measure())),
+          Empty(),
+          Digit2(c, d, m(c.measure(), d.measure())),
+          measure
+        )
       }
     }
   }.ensuring(res =>
@@ -216,23 +226,41 @@ private sealed trait Digit[T, M]:
       && res.toListR(depth) == this.toListR(depth)
   )
 
+  def measure()(implicit m: Measure[T, M]): M = {
+    require(m.isValid)
+
+    this match {
+      case Digit1(a)                   => a.measure()
+      case Digit2(_, _, measure)       => measure
+      case Digit3(_, _, _, measure)    => measure
+      case Digit4(_, _, _, _, measure) => measure
+    }
+  }
+
 /// A Digit[T] is either a:
 /// - Digit1[T](Node[T]),
 /// - Digit2[T](Node[T], Node[T]),
 /// - Digit3[T](Node[T], Node[T], Node[T]), or
 /// - Digit4[T](Node[T], Node[T], Node[T], Node[T])
 
-private final case class Digit1[T, M](a: Node[T, M]) extends Digit[T, M]
-private final case class Digit2[T, M](a: Node[T, M], b: Node[T, M])
-    extends Digit[T, M]
+private final case class Digit1[T, M](
+    a: Node[T, M]
+) extends Digit[T, M]
+private final case class Digit2[T, M](
+    a: Node[T, M],
+    b: Node[T, M],
+    m: M
+) extends Digit[T, M]
 private final case class Digit3[T, M](
     a: Node[T, M],
     b: Node[T, M],
-    c: Node[T, M]
+    c: Node[T, M],
+    m: M
 ) extends Digit[T, M]
 private final case class Digit4[T, M](
     a: Node[T, M],
     b: Node[T, M],
     c: Node[T, M],
-    d: Node[T, M]
+    d: Node[T, M],
+    m: M
 ) extends Digit[T, M]

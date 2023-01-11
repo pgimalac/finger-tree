@@ -280,15 +280,15 @@ object FingerTreeLemmas {
     digit.toListL(depth) ==
       digit.headL(depth).toListL(depth) ++ tailList because {
         digit match {
-          case Digit1(a)    => trivial
-          case Digit2(a, b) => trivial
-          case Digit3(a, b, c) =>
+          case Digit1(a)       => trivial
+          case Digit2(a, b, _) => trivial
+          case Digit3(a, b, c, _) =>
             ListLemmas.associativeConcat(
               a.toListL(depth),
               b.toListL(depth),
               c.toListL(depth)
             )
-          case Digit4(a, b, c, d) =>
+          case Digit4(a, b, c, d, _) =>
             ListLemmas.associativeConcat(
               a.toListL(depth),
               b.toListL(depth),
@@ -313,15 +313,15 @@ object FingerTreeLemmas {
     digit.toListR(depth) ==
       digit.headR(depth).toListR(depth) ++ tailList because {
         digit match {
-          case Digit1(a)    => trivial
-          case Digit2(a, b) => trivial
-          case Digit3(a, b, c) =>
+          case Digit1(a)       => trivial
+          case Digit2(a, b, _) => trivial
+          case Digit3(a, b, c, _) =>
             ListLemmas.associativeConcat(
               c.toListR(depth),
               b.toListR(depth),
               a.toListR(depth)
             )
-          case Digit4(a, b, c, d) =>
+          case Digit4(a, b, c, d, _) =>
             ListLemmas.associativeConcat(
               d.toListR(depth),
               c.toListR(depth),

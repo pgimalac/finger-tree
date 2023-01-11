@@ -54,16 +54,19 @@ object Helpers {
     )
 
     elems match {
-      case Nil()                   => ???
-      case Cons(a, Nil())          => ???
-      case Cons(a, Cons(b, Nil())) => List(Node2(a, b))
+      case Nil()          => ???
+      case Cons(a, Nil()) => ???
+      case Cons(a, Cons(b, Nil())) =>
+        List(Node2(a, b, m(a.measure(), b.measure())))
       case Cons(a, Cons(b, Cons(c, Nil()))) =>
         ListLemmas.associativeConcat(
           a.toListL(depth),
           b.toListL(depth),
           c.toListL(depth)
         )
-        List[Node[T, M]](Node3(a, b, c))
+        List[Node[T, M]](
+          Node3(a, b, c, m(a.measure(), b.measure(), c.measure()))
+        )
       case Cons(a, Cons(b, Cons(c, Cons(d, Nil())))) =>
         ListLemmas.associativeConcat(
           a.toListL(depth),
@@ -85,7 +88,10 @@ object Helpers {
           toListR(Cons(c, Cons(d, Nil())), depth) ==
             d.toListR(depth) ++ c.toListR(depth)
         )
-        List[Node[T, M]](Node2(a, b), Node2(c, d))
+        List[Node[T, M]](
+          Node2(a, b, m(a.measure(), b.measure())),
+          Node2(c, d, m(c.measure(), d.measure()))
+        )
       case Cons(a, Cons(b, Cons(c, tail))) => {
         ListLemmas.associativeConcat(
           a.toListL(depth),
@@ -99,7 +105,10 @@ object Helpers {
           b.toListR(depth),
           a.toListR(depth)
         )
-        Cons(Node3(a, b, c), toNodes(tail, depth))
+        Cons(
+          Node3(a, b, c, m(a.measure(), b.measure(), c.measure())),
+          toNodes(tail, depth)
+        )
       }
     }
   }.ensuring(res =>
@@ -125,12 +134,23 @@ object Helpers {
 
     prefixTail match {
       case Some(digit) =>
-        Deep(digit, spine, suffix)
+        Deep(
+          digit,
+          spine,
+          suffix,
+          m(digit.measure(), spine.measure(), suffix.measure())
+        )
       case None() =>
         spine match {
-          case Empty()       => suffix.toTree(depth)
-          case Single(value) => Deep(value.toDigit(depth + 1), Empty(), suffix)
-          case Deep(spinePrefix, spineSpine, spineSuffix) =>
+          case Empty() => suffix.toTree(depth)
+          case Single(value) =>
+            Deep(
+              value.toDigit(depth + 1),
+              Empty(),
+              suffix,
+              m(value.measure(), suffix.measure())
+            )
+          case Deep(spinePrefix, spineSpine, spineSuffix, _) =>
             val prefix = spinePrefix.tailL(depth + 1) match {
               case Some(pref) => pref.toListL(depth + 1)
               case None()     => List()
@@ -142,15 +162,19 @@ object Helpers {
               spineSpine.toListL(depth + 2),
               spineSuffix.toListL(depth + 1)
             )
+
+            val newPrefix = spinePrefix.headL(depth + 1).toDigit(depth + 1)
+            val newSpine = deepL(
+              spinePrefix.tailL(depth + 1),
+              spineSpine,
+              spineSuffix,
+              depth + 1
+            )
             Deep(
-              spinePrefix.headL(depth + 1).toDigit(depth + 1),
-              deepL(
-                spinePrefix.tailL(depth + 1),
-                spineSpine,
-                spineSuffix,
-                depth + 1
-              ),
-              suffix
+              newPrefix,
+              newSpine,
+              suffix,
+              m(newPrefix.measure(), newSpine.measure(), suffix.measure())
             )
         }
     }
@@ -182,12 +206,24 @@ object Helpers {
     )
 
     suffixTail match {
-      case Some(digit) => Deep(prefix, spine, digit)
+      case Some(digit) =>
+        Deep(
+          prefix,
+          spine,
+          digit,
+          m(prefix.measure(), spine.measure(), digit.measure())
+        )
       case None() =>
         spine match {
-          case Empty()       => prefix.toTree(depth)
-          case Single(value) => Deep(prefix, Empty(), value.toDigit(depth + 1))
-          case Deep(spinePrefix, spineSpine, spineSuffix) =>
+          case Empty() => prefix.toTree(depth)
+          case Single(value) =>
+            Deep(
+              prefix,
+              Empty(),
+              value.toDigit(depth + 1),
+              m(prefix.measure(), value.measure())
+            )
+          case Deep(spinePrefix, spineSpine, spineSuffix, _) =>
             val suffix = spineSuffix.tailR(depth + 1) match {
               case Some(suff) => suff.toListR(depth + 1)
               case None()     => List()
@@ -199,15 +235,19 @@ object Helpers {
               spineSpine.toListR(depth + 2),
               spinePrefix.toListR(depth + 1)
             )
+
+            val newSpine = deepR(
+              spinePrefix,
+              spineSpine,
+              spineSuffix.tailR(depth + 1),
+              depth + 1
+            )
+            val newSuffix = spineSuffix.headR(depth + 1).toDigit(depth + 1)
             Deep(
               prefix,
-              deepR(
-                spinePrefix,
-                spineSpine,
-                spineSuffix.tailR(depth + 1),
-                depth + 1
-              ),
-              spineSuffix.headR(depth + 1).toDigit(depth + 1)
+              newSpine,
+              newSuffix,
+              m(prefix.measure(), newSpine.measure(), newSuffix.measure())
             )
         }
     }
