@@ -10,6 +10,7 @@ import stainless.proof._
 /// The case classes of Node[T] are found at the end of the file.
 
 sealed trait Node[T, M]:
+  import NodeHelpers._
 
   /// ***INVARIANT FUNCTIONS*** ///
 
@@ -99,6 +100,7 @@ sealed trait Node[T, M]:
     }
   }.ensuring(res =>
     res.isWellFormed(depth - 1) &&
+      res.measure() == this.measure() &&
       res.toListL(depth - 1) == this.toListL(depth) &&
       res.toListR(depth - 1) == this.toListR(depth)
   )
@@ -129,3 +131,35 @@ final case class Node3[T, M](
     right: Node[T, M],
     m: M
 ) extends Node[T, M]
+
+object NodeHelpers {
+  def makeNode[T, M](a: Node[T, M], b: Node[T, M], depth: BigInt)(implicit
+      m: Measure[T, M]
+  ): Node[T, M] = {
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        a.isWellFormed(depth) &&
+        b.isWellFormed(depth)
+    )
+    Node2(a, b, m(a.measure(), b.measure()))
+  }.ensuring(_.isWellFormed(depth + 1))
+
+  def makeNode[T, M](
+      a: Node[T, M],
+      b: Node[T, M],
+      c: Node[T, M],
+      depth: BigInt
+  )(implicit
+      m: Measure[T, M]
+  ): Node[T, M] = {
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        a.isWellFormed(depth) &&
+        b.isWellFormed(depth) &&
+        c.isWellFormed(depth)
+    )
+    Node2(a, b, m(a.measure(), b.measure(), c.measure()))
+  }.ensuring(_.isWellFormed(depth + 1))
+}

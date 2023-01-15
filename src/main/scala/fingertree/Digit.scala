@@ -10,7 +10,8 @@ import stainless.proof._
 /// call segments, to make operations on the finger tree simpler. The case classes
 /// of Digit[T] are found at the end of the file.
 
-private sealed trait Digit[T, M]:
+sealed trait Digit[T, M]:
+  import DigitHelpers._
 
   /// ***INVARIANT AND PROOF HELPER FUNCTIONS*** ///
 
@@ -42,12 +43,52 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(a)             => a
-      case Digit2(a, _, _)       => a
-      case Digit3(a, _, _, _)    => a
-      case Digit4(a, _, _, _, _) => a
+      case Digit1(a) => a
+      case Digit2(a, b, _) =>
+        ListLemmas.headConcat(a.toListL(depth), b.toListL(depth))
+        ListLemmas.lastConcat(b.toListR(depth), a.toListR(depth))
+
+        a
+      case Digit3(a, b, c, _) =>
+        ListLemmas.headConcat(a.toListL(depth), b.toListL(depth))
+        ListLemmas.lastConcat(b.toListR(depth), a.toListR(depth))
+        ListLemmas.headConcat(
+          a.toListL(depth) ++ b.toListL(depth),
+          c.toListL(depth)
+        )
+        ListLemmas.lastConcat(
+          c.toListR(depth) ++ b.toListR(depth),
+          a.toListR(depth)
+        )
+
+        a
+      case Digit4(a, b, c, d, _) =>
+        ListLemmas.headConcat(a.toListL(depth), b.toListL(depth))
+        ListLemmas.lastConcat(b.toListR(depth), a.toListR(depth))
+        ListLemmas.headConcat(
+          a.toListL(depth) ++ b.toListL(depth),
+          c.toListL(depth)
+        )
+        ListLemmas.lastConcat(
+          c.toListR(depth) ++ b.toListR(depth),
+          a.toListR(depth)
+        )
+        ListLemmas.headConcat(
+          a.toListL(depth) ++ b.toListL(depth) ++ c.toListL(depth),
+          d.toListL(depth)
+        )
+        ListLemmas.lastConcat(
+          d.toListR(depth) ++ c.toListR(depth) ++ b.toListR(depth),
+          a.toListR(depth)
+        )
+
+        a
     }
-  }.ensuring(res => res.isWellFormed(depth))
+  }.ensuring(res =>
+    res.isWellFormed(depth) &&
+      this.toListL(depth).headOption == res.toListL(depth).headOption &&
+      this.toListR(depth).lastOption == res.toListR(depth).lastOption
+  )
 
   /// Gets last segment in a digit
   def headR(depth: BigInt)(implicit m: Measure[T, M]): Node[T, M] = {
@@ -61,7 +102,9 @@ private sealed trait Digit[T, M]:
     }
   }.ensuring(res =>
     res.isWellFormed(depth) &&
-      res == this.toNodeList(depth).last
+      res == this.toNodeList(depth).last &&
+      this.toListR(depth).headOption == res.toListR(depth).headOption &&
+      this.toListL(depth).lastOption == res.toListL(depth).lastOption
   )
 
   /// Produces a new digit with all the segments of the original except for the first
@@ -69,12 +112,10 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(_)       => None()
-      case Digit2(_, b, _) => Some(Digit1(b))
-      case Digit3(_, b, c, _) =>
-        Some(Digit2(b, c, m(b.measure(), c.measure())))
-      case Digit4(_, b, c, d, _) =>
-        Some(Digit3(b, c, d, m(b.measure(), c.measure(), d.measure())))
+      case Digit1(_)             => None()
+      case Digit2(_, b, _)       => Some(makeDigit(b, depth))
+      case Digit3(_, b, c, _)    => Some(makeDigit(b, c, depth))
+      case Digit4(_, b, c, d, _) => Some(makeDigit(b, c, d, depth))
     }
   }.ensuring(res => res.forall(_.isWellFormed(depth)))
 
@@ -83,12 +124,10 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(_)       => None()
-      case Digit2(a, _, _) => Some(Digit1(a))
-      case Digit3(a, b, _, _) =>
-        Some(Digit2(a, b, m(a.measure(), b.measure())))
-      case Digit4(a, b, c, _, _) =>
-        Some(Digit3(a, b, c, m(a.measure(), b.measure(), c.measure())))
+      case Digit1(_)             => None()
+      case Digit2(a, _, _)       => Some(makeDigit(a, depth))
+      case Digit3(a, b, _, _)    => Some(makeDigit(a, b, depth))
+      case Digit4(a, b, c, _, _) => Some(makeDigit(a, b, c, depth))
     }
   }.ensuring(res => res.forall(_.isWellFormed(depth)))
 
@@ -189,8 +228,9 @@ private sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(a)             => Single(a)
-      case Digit2(a, b, measure) => Deep(Digit1(a), Empty(), Digit1(b), measure)
+      case Digit1(a) => Single(a)
+      case Digit2(a, b, measure) =>
+        Deep(makeDigit(a, depth), Empty(), makeDigit(b, depth), measure)
       case Digit3(a, b, c, measure) => {
         ListLemmas.associativeConcat(
           c.toListR(depth),
@@ -198,8 +238,7 @@ private sealed trait Digit[T, M]:
           a.toListR(depth)
         )
 
-        val newPrefix = Digit2(a, b, m(a.measure(), b.measure()))
-        Deep(newPrefix, Empty(), Digit1(c), measure)
+        Deep(makeDigit(a, b, depth), Empty(), makeDigit(c, depth), measure)
       }
       case Digit4(a, b, c, d, measure) => {
         ListLemmas.associativeConcat(
@@ -215,12 +254,7 @@ private sealed trait Digit[T, M]:
           a.toListR(depth)
         )
 
-        Deep(
-          Digit2(a, b, m(a.measure(), b.measure())),
-          Empty(),
-          Digit2(c, d, m(c.measure(), d.measure())),
-          measure
-        )
+        Deep(makeDigit(a, b, depth), Empty(), makeDigit(c, d, depth), measure)
       }
     }
   }.ensuring(res =>
@@ -229,6 +263,8 @@ private sealed trait Digit[T, M]:
       res.toListL(depth) == this.toListL(depth) &&
       res.toListR(depth) == this.toListR(depth)
   )
+
+  /// *** MEASURE *** ///
 
   def measure()(implicit m: Measure[T, M]): M = {
     require(m.isValid)
@@ -241,30 +277,172 @@ private sealed trait Digit[T, M]:
     }
   }
 
+  def split(depth: BigInt, acc: M, p: M => Boolean)(implicit
+      m: Measure[T, M]
+  ): (Option[Digit[T, M]], Node[T, M], Option[Digit[T, M]]) = {
+    decreases(this)
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        this.isWellFormed(depth) &&
+        !p(acc) && p(this.measure())
+    )
+
+    this match {
+      case Digit1(a) => (None(), a, None())
+      case Digit2(a, b, _) if p(m(acc, a.measure())) =>
+        (None(), a, Some(makeDigit(b, depth)))
+      case Digit2(a, b, _) =>
+        (Some(makeDigit(a, depth)), b, None())
+      case Digit3(a, b, c, _) if p(m(acc, a.measure())) =>
+        (None(), a, Some(makeDigit(b, c, depth)))
+      case Digit3(a, b, c, _) if p(m(acc, a.measure(), b.measure())) =>
+        (Some(makeDigit(a, depth)), b, Some(makeDigit(c, depth)))
+      case Digit3(a, b, c, _) =>
+        (Some(makeDigit(a, b, depth)), c, None())
+      case Digit4(a, b, c, d, _) if p(m(acc, a.measure())) =>
+        (None(), a, Some(makeDigit(b, c, d, depth)))
+      case Digit4(a, b, c, d, _) if p(m(acc, a.measure(), b.measure())) =>
+        (Some(makeDigit(a, depth)), b, Some(makeDigit(c, d, depth)))
+      case Digit4(a, b, c, d, _)
+          if p(m(acc, a.measure(), b.measure(), c.measure())) =>
+        (Some(makeDigit(a, b, depth)), c, Some(makeDigit(d, depth)))
+      case Digit4(a, b, c, d, _) =>
+        (Some(makeDigit(a, b, c, depth)), d, None())
+    }
+  }.ensuring { case (pref, elem, suff) =>
+    pref.forall(_.isWellFormed(depth)) &&
+    elem.isWellFormed(depth) &&
+    suff.forall(_.isWellFormed(depth)) &&
+    p(m(acc, elem.measure())) && {
+      val (prefL, prefR) = pref match {
+        case None()     => (List(), List())
+        case Some(pref) => (pref.toListL(depth), pref.toListR(depth))
+      }
+      val (suffL, suffR) = suff match {
+        case None()     => (List(), List())
+        case Some(suff) => (suff.toListL(depth), suff.toListR(depth))
+      }
+      this.toListL(depth) == prefL ++ elem.toListL(depth) ++ suffL &&
+      this.toListR(depth) == suffR ++ elem.toListR(depth) ++ prefR
+    }
+  }
+
 /// A Digit[T] is either a:
 /// - Digit1[T](Node[T]),
 /// - Digit2[T](Node[T], Node[T]),
 /// - Digit3[T](Node[T], Node[T], Node[T]), or
 /// - Digit4[T](Node[T], Node[T], Node[T], Node[T])
 
-private final case class Digit1[T, M](
+final case class Digit1[T, M](
     a: Node[T, M]
 ) extends Digit[T, M]
-private final case class Digit2[T, M](
+final case class Digit2[T, M](
     a: Node[T, M],
     b: Node[T, M],
     m: M
 ) extends Digit[T, M]
-private final case class Digit3[T, M](
+final case class Digit3[T, M](
     a: Node[T, M],
     b: Node[T, M],
     c: Node[T, M],
     m: M
 ) extends Digit[T, M]
-private final case class Digit4[T, M](
+final case class Digit4[T, M](
     a: Node[T, M],
     b: Node[T, M],
     c: Node[T, M],
     d: Node[T, M],
     m: M
 ) extends Digit[T, M]
+
+object DigitHelpers {
+  inline def makeDigit[T, M](a: Node[T, M], depth: BigInt)(implicit
+      m: Measure[T, M]
+  ): Digit[T, M] = {
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        a.isWellFormed(depth)
+    )
+    Digit1[T, M](a)
+  }.ensuring(res =>
+    res.isWellFormed(depth) &&
+      res.toListL(depth) == a.toListL(depth) &&
+      res.toListR(depth) == a.toListR(depth)
+  )
+
+  inline def makeDigit[T, M](a: Node[T, M], b: Node[T, M], depth: BigInt)(
+      implicit m: Measure[T, M]
+  ): Digit[T, M] = {
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        a.isWellFormed(depth) &&
+        b.isWellFormed(depth)
+    )
+    Digit2[T, M](a, b, m(a.measure(), b.measure()))
+  }.ensuring(res =>
+    res.isWellFormed(depth) &&
+      res.toListL(depth) == a.toListL(depth) ++ b.toListL(depth) &&
+      res.toListR(depth) == b.toListR(depth) ++ a.toListR(depth)
+  )
+
+  inline def makeDigit[T, M](
+      a: Node[T, M],
+      b: Node[T, M],
+      c: Node[T, M],
+      depth: BigInt
+  )(implicit
+      m: Measure[T, M]
+  ): Digit[T, M] = {
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        a.isWellFormed(depth) &&
+        b.isWellFormed(depth) &&
+        c.isWellFormed(depth)
+    )
+
+    Digit3[T, M](a, b, c, m(a.measure(), b.measure(), c.measure()))
+  }.ensuring(res =>
+    res.isWellFormed(depth) &&
+      res.toListL(depth) == a.toListL(depth) ++ b.toListL(depth)
+      ++ c.toListR(depth) &&
+      res.toListR(depth) == c.toListR(depth) ++ b.toListR(depth)
+      ++ a.toListR(depth)
+  )
+
+  inline def makeDigit[T, M](
+      a: Node[T, M],
+      b: Node[T, M],
+      c: Node[T, M],
+      d: Node[T, M],
+      depth: BigInt
+  )(implicit
+      m: Measure[T, M]
+  ): Digit[T, M] = {
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        a.isWellFormed(depth) &&
+        b.isWellFormed(depth) &&
+        c.isWellFormed(depth) &&
+        d.isWellFormed(depth)
+    )
+
+    Digit4[T, M](
+      a,
+      b,
+      c,
+      d,
+      m(a.measure(), b.measure(), c.measure(), d.measure())
+    )
+  }.ensuring(res =>
+    res.isWellFormed(depth) &&
+      res.toListL(depth) == a.toListL(depth) ++ b.toListL(depth)
+      ++ c.toListR(depth) ++ d.toListL(depth) &&
+      res.toListR(depth) == d.toListR(depth) ++ c.toListR(depth)
+      ++ b.toListR(depth) ++ a.toListR(depth)
+  )
+}

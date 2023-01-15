@@ -8,6 +8,9 @@ import stainless.proof._
 /// with the definition of the types
 
 object Helpers {
+  import NodeHelpers._
+  import TreeHelpers._
+
   /// Converts a list of Nodes to a list of elements, from the left side
   def toListL[T, M](elems: List[Node[T, M]], depth: BigInt)(implicit
       m: Measure[T, M]
@@ -46,6 +49,7 @@ object Helpers {
   def toNodes[T, M](elems: List[Node[T, M]], depth: BigInt)(implicit
       m: Measure[T, M]
   ): List[Node[T, M]] = {
+    decreases(elems)
     require(
       depth >= 0
         && elems.size >= 2
@@ -57,17 +61,17 @@ object Helpers {
       case Nil()          => ???
       case Cons(a, Nil()) => ???
       case Cons(a, Cons(b, Nil())) =>
-        List(Node2(a, b, m(a.measure(), b.measure())))
+        List(makeNode(a, b, depth))
       case Cons(a, Cons(b, Cons(c, Nil()))) =>
+        check(Cons(b, Cons(c, Nil())).forall(_.isWellFormed(depth)))
         ListLemmas.associativeConcat(
           a.toListL(depth),
           b.toListL(depth),
           c.toListL(depth)
         )
-        List[Node[T, M]](
-          Node3(a, b, c, m(a.measure(), b.measure(), c.measure()))
-        )
+        List[Node[T, M]](makeNode(a, b, c, depth))
       case Cons(a, Cons(b, Cons(c, Cons(d, Nil())))) =>
+        check(Cons(c, Cons(d, Nil())).forall(_.isWellFormed(depth)))
         ListLemmas.associativeConcat(
           a.toListL(depth),
           b.toListL(depth),
@@ -88,11 +92,9 @@ object Helpers {
           toListR(Cons(c, Cons(d, Nil())), depth) ==
             d.toListR(depth) ++ c.toListR(depth)
         )
-        List[Node[T, M]](
-          Node2(a, b, m(a.measure(), b.measure())),
-          Node2(c, d, m(c.measure(), d.measure()))
-        )
+        List[Node[T, M]](makeNode(a, b, depth), makeNode(c, d, depth))
       case Cons(a, Cons(b, Cons(c, tail))) => {
+        check(Cons(c, tail).forall(_.isWellFormed(depth)))
         ListLemmas.associativeConcat(
           a.toListL(depth),
           b.toListL(depth),
@@ -105,10 +107,7 @@ object Helpers {
           b.toListR(depth),
           a.toListR(depth)
         )
-        Cons(
-          Node3(a, b, c, m(a.measure(), b.measure(), c.measure())),
-          toNodes(tail, depth)
-        )
+        Cons(makeNode(a, b, c, depth), toNodes(tail, depth))
       }
     }
   }.ensuring(res =>
@@ -133,23 +132,12 @@ object Helpers {
     )
 
     prefixTail match {
-      case Some(digit) =>
-        Deep(
-          digit,
-          spine,
-          suffix,
-          m(digit.measure(), spine.measure(), suffix.measure())
-        )
+      case Some(digit) => makeDeep(digit, spine, suffix, depth)
       case None() =>
         spine match {
           case Empty() => suffix.toTree(depth)
           case Single(value) =>
-            Deep(
-              value.toDigit(depth + 1),
-              Empty(),
-              suffix,
-              m(value.measure(), suffix.measure())
-            )
+            makeDeep(value.toDigit(depth + 1), Empty(), suffix, depth)
           case Deep(spinePrefix, spineSpine, spineSuffix, _) =>
             val prefix = spinePrefix.tailL(depth + 1) match {
               case Some(pref) => pref.toListL(depth + 1)
@@ -170,12 +158,7 @@ object Helpers {
               spineSuffix,
               depth + 1
             )
-            Deep(
-              newPrefix,
-              newSpine,
-              suffix,
-              m(newPrefix.measure(), newSpine.measure(), suffix.measure())
-            )
+            makeDeep(newPrefix, newSpine, suffix, depth)
         }
     }
   }.ensuring(res =>
@@ -207,22 +190,12 @@ object Helpers {
 
     suffixTail match {
       case Some(digit) =>
-        Deep(
-          prefix,
-          spine,
-          digit,
-          m(prefix.measure(), spine.measure(), digit.measure())
-        )
+        makeDeep(prefix, spine, digit, depth)
       case None() =>
         spine match {
           case Empty() => prefix.toTree(depth)
           case Single(value) =>
-            Deep(
-              prefix,
-              Empty(),
-              value.toDigit(depth + 1),
-              m(prefix.measure(), value.measure())
-            )
+            makeDeep(prefix, Empty(), value.toDigit(depth + 1), depth)
           case Deep(spinePrefix, spineSpine, spineSuffix, _) =>
             val suffix = spineSuffix.tailR(depth + 1) match {
               case Some(suff) => suff.toListR(depth + 1)
@@ -243,12 +216,7 @@ object Helpers {
               depth + 1
             )
             val newSuffix = spineSuffix.headR(depth + 1).toDigit(depth + 1)
-            Deep(
-              prefix,
-              newSpine,
-              newSuffix,
-              m(prefix.measure(), newSpine.measure(), newSuffix.measure())
-            )
+            makeDeep(prefix, newSpine, newSuffix, depth)
         }
     }
   }.ensuring(res =>

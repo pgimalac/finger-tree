@@ -11,6 +11,9 @@ import stainless.proof._
 /// the file.
 
 sealed trait FingerTree[T, M]:
+  import NodeHelpers._
+  import DigitHelpers._
+  import TreeHelpers._
 
   /// ***INVARIANT FUNCTIONS*** ///
 
@@ -39,8 +42,23 @@ sealed trait FingerTree[T, M]:
 
   /// ***CONVERSION FUNCTIONS*** ///
 
+  def toTreeL[T, M](
+      depth: BigInt,
+      elems: List[Node[T, M]]
+  )(implicit m: Measure[T, M]): FingerTree[T, M] = {
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        elems.forall(_.isWellFormed(depth))
+    )
+
+    elems match {
+      case Nil()      => Empty()
+      case Cons(h, t) => toTreeL(depth, t).addL(h, depth)
+    }
+  }.ensuring(res => res.isWellFormed(depth))
+
   /// Constructs a tree from a list, adding repeatedly to the left of the tree
-  /// NOTE: This has the effect of reversing the ordering of the original list
   def toTreeL[T, M](
       elems: List[T]
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
@@ -51,7 +69,7 @@ sealed trait FingerTree[T, M]:
       case Cons(h, t) => toTreeL(t).addL(h)
     }
   }.ensuring(res =>
-    res.isWellFormed &&
+    res.isWellFormed(0) &&
       res.toListL() == elems
   )
 
@@ -66,7 +84,7 @@ sealed trait FingerTree[T, M]:
       case Cons(h, t) => toTreeR(t).addR(h)
     }
   }.ensuring(res =>
-    res.isWellFormed &&
+    res.isWellFormed(0) &&
       res.toListR() == elems
   )
 
@@ -100,7 +118,7 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around toListL(BigInt), starting from the top-most level of the tree
   def toListL()(implicit m: Measure[T, M]): List[T] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this.toListL(0)
   }.ensuring(res => res.reverse == this.toListR())
@@ -120,7 +138,7 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around toListR(BigInt), starting from the top-most level of the tree
   def toListR()(implicit m: Measure[T, M]): List[T] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this.toListR(0)
   }
@@ -145,9 +163,9 @@ sealed trait FingerTree[T, M]:
       case Single(existingValue) =>
         check(m(value.measure(), m.zero) == value.measure())
         Deep(
-          Digit1(value),
+          makeDigit(value, depth),
           Empty(),
-          Digit1(existingValue),
+          makeDigit(existingValue, depth),
           m(value.measure(), existingValue.measure())
         )
       case Deep(Digit1(a), spine, suffix, _) => {
@@ -163,7 +181,7 @@ sealed trait FingerTree[T, M]:
           value.toListR(depth)
         )
 
-        val newPrefix = Digit2(value, a, m(value.measure(), a.measure()))
+        val newPrefix = makeDigit(value, a, depth)
         check(
           m(
             value.measure(),
@@ -174,12 +192,7 @@ sealed trait FingerTree[T, M]:
             suffix.measure()
           )
         )
-        Deep(
-          newPrefix,
-          spine,
-          suffix,
-          m(newPrefix.measure(), spine.measure(), suffix.measure())
-        )
+        makeDeep(newPrefix, spine, suffix, depth)
       }
       case Deep(Digit2(a, b, _), spine, suffix, _) => {
         ListLemmas.associativeConcat(
@@ -200,14 +213,8 @@ sealed trait FingerTree[T, M]:
           value.toListR(depth)
         )
 
-        val newPrefix =
-          Digit3(value, a, b, m(value.measure(), a.measure(), b.measure()))
-        Deep(
-          newPrefix,
-          spine,
-          suffix,
-          m(newPrefix.measure(), spine.measure(), suffix.measure())
-        )
+        val newPrefix = makeDigit(value, a, b, depth)
+        makeDeep(newPrefix, spine, suffix, depth)
       }
       case Deep(Digit3(a, b, c, _), spine, suffix, _) => {
         ListLemmas.associativeConcat(
@@ -234,13 +241,7 @@ sealed trait FingerTree[T, M]:
           value.toListR(depth)
         )
 
-        val newPrefix = Digit4(
-          value,
-          a,
-          b,
-          c,
-          m(value.measure(), a.measure(), b.measure(), c.measure())
-        )
+        val newPrefix = makeDigit(value, a, b, c, depth)
         Deep(
           newPrefix,
           spine,
@@ -286,17 +287,9 @@ sealed trait FingerTree[T, M]:
           value.toListR(depth)
         )
 
-        val newPrefix = Digit2(value, a, m(value.measure(), a.measure()))
-        val newSpine = spine.addL(
-          Node3(b, c, d, m(b.measure(), c.measure(), d.measure())),
-          depth + 1
-        )
-        Deep(
-          newPrefix,
-          newSpine,
-          suffix,
-          m(newPrefix.measure(), newSpine.measure(), suffix.measure())
-        )
+        val newPrefix = makeDigit(value, a, depth)
+        val newSpine = spine.addL(makeNode(b, c, d, depth), depth + 1)
+        makeDeep(newPrefix, newSpine, suffix, depth)
       }
     }
   }.ensuring(res =>
@@ -344,11 +337,11 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around addL(Node[T], BigInt) that begins from the root of the tree
   def addL(value: T)(implicit m: Measure[T, M]): FingerTree[T, M] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this.addL(Leaf(value), 0)
   }.ensuring(res =>
-    res.isWellFormed &&
+    res.isWellFormed(0) &&
       res.toListL(0) == value :: this.toListL(0) &&
       res.toListR(0) == this.toListR(0) :+ value &&
       res.measure() == m(m(value), this.measure())
@@ -368,11 +361,11 @@ sealed trait FingerTree[T, M]:
     this match {
       case Empty() => Single(value)
       case Single(existingValue) =>
-        Deep(
-          Digit1(existingValue),
+        makeDeep(
+          makeDigit(existingValue, depth),
           Empty(),
-          Digit1(value),
-          m(existingValue.measure(), value.measure())
+          makeDigit(value, depth),
+          depth
         )
       case Deep(prefix, spine, Digit1(a), _) => {
         ListLemmas.associativeConcat(
@@ -387,13 +380,7 @@ sealed trait FingerTree[T, M]:
           value.toListL(depth)
         )
 
-        val newSuffix = Digit2(a, value, m(a.measure(), value.measure()))
-        Deep(
-          prefix,
-          spine,
-          newSuffix,
-          m(prefix.measure(), spine.measure(), newSuffix.measure())
-        )
+        makeDeep(prefix, spine, makeDigit(a, value, depth), depth)
       }
       case Deep(prefix, spine, Digit2(a, b, _), _) => {
         ListLemmas.associativeConcat(
@@ -414,14 +401,7 @@ sealed trait FingerTree[T, M]:
           value.toListL(depth)
         )
 
-        val newSuffix =
-          Digit3(a, b, value, m(a.measure(), b.measure(), value.measure()))
-        Deep(
-          prefix,
-          spine,
-          newSuffix,
-          m(prefix.measure(), spine.measure(), newSuffix.measure())
-        )
+        makeDeep(prefix, spine, makeDigit(a, b, value, depth), depth)
       }
       case Deep(prefix, spine, Digit3(a, b, c, _), _) => {
         ListLemmas.associativeConcat(
@@ -448,19 +428,7 @@ sealed trait FingerTree[T, M]:
           value.toListL(depth)
         )
 
-        val newSuffix = Digit4(
-          a,
-          b,
-          c,
-          value,
-          m(a.measure(), b.measure(), c.measure(), value.measure())
-        )
-        Deep(
-          prefix,
-          spine,
-          newSuffix,
-          m(prefix.measure(), spine.measure(), newSuffix.measure())
-        )
+        makeDeep(prefix, spine, makeDigit(a, b, c, value, depth), depth)
       }
       case Deep(prefix, spine, Digit4(a, b, c, d, _), _) => {
         ListLemmas.associativeConcat(
@@ -500,17 +468,9 @@ sealed trait FingerTree[T, M]:
           value.toListL(depth)
         )
 
-        val newSpine = spine.addR(
-          Node3(a, b, c, m(a.measure(), b.measure(), c.measure())),
-          depth + 1
-        )
-        val newSuffix = Digit2(d, value, m(d.measure(), value.measure()))
-        Deep(
-          prefix,
-          newSpine,
-          newSuffix,
-          m(prefix.measure(), newSpine.measure(), newSuffix.measure())
-        )
+        val newSpine = spine.addR(makeNode(a, b, c, depth), depth + 1)
+        val newSuffix = makeDigit(d, value, depth)
+        makeDeep(prefix, newSpine, newSuffix, depth)
       }
     }
   }.ensuring(res =>
@@ -558,11 +518,11 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around addR(Node[T], BigInt) that begins from the root of the tree
   def addR(value: T)(implicit m: Measure[T, M]): FingerTree[T, M] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this.addR(Leaf(value), 0)
   }.ensuring(res =>
-    res.isWellFormed &&
+    res.isWellFormed(0) &&
       res.toListR(0) == value :: this.toListR(0) &&
       res.toListL(0) == this.toListL(0) :+ value &&
       res.measure() == m(this.measure(), m(value))
@@ -570,16 +530,20 @@ sealed trait FingerTree[T, M]:
 
   /// Potentially gets "head" of left-ordered list represented by tree
   def headL(implicit m: Measure[T, M]): Option[T] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this match {
-      case Empty()         => None[T]()
-      case Single(Leaf(e)) => Some(e)
-      case Single(_)       => ??? // Should never get here
+      case Empty() => None[T]()
+      case Single(Leaf(e)) =>
+        ListLemmas.reverseHead(this.toListL(0))
+
+        Some(e)
+      case Single(_) => ??? // Should never get here
       case Deep(prefix, spine, suffix, _) =>
         prefix.headL(0) match {
           case Leaf(value) => {
-            ListLemmas.reverseHead(this.toListL())
+            ListLemmas.reverseHead(this.toListL(0))
+            check(Some[T](value) == this.toListL(0).headOption)
 
             Some(value)
           }
@@ -588,13 +552,13 @@ sealed trait FingerTree[T, M]:
     }
   }.ensuring(res =>
     res.isDefined != this.isEmpty &&
-      res == this.toListL().headOption &&
-      res == this.toListR().lastOption
+      res == this.toListL(0).headOption &&
+      res == this.toListR(0).lastOption
   )
 
   /// Potentially gets "tail" of left-ordered list represented by tree
   def tailL(implicit m: Measure[T, M]): Option[FingerTree[T, M]] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this.viewL match {
       case ConsV(_, rest) => {
@@ -609,14 +573,14 @@ sealed trait FingerTree[T, M]:
       (res match {
         case None() => true
         case Some(rest) =>
-          rest.isWellFormed &&
+          rest.isWellFormed(0) &&
           rest.toListL() == this.toListL().tail
       })
   )
 
   /// Splits a tree into its leftmost element and the rest of the tree
   def viewL(implicit m: Measure[T, M]): View[T, M] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this match {
       case Empty()             => NilV()
@@ -646,7 +610,7 @@ sealed trait FingerTree[T, M]:
       (res match {
         case NilV() => true
         case ConsV(head, rest) =>
-          rest.isWellFormed &&
+          rest.isWellFormed(0) &&
           Some[T](head) == this.toListL().headOption &&
           Some[T](head) == this.toListR().lastOption &&
           rest.toListL() == this.toListL().tail
@@ -656,7 +620,7 @@ sealed trait FingerTree[T, M]:
   /// Potentially gets "head" of right-ordered list represented by tree,
   /// i.e. last element of left-ordered list represented by tree
   def headR(implicit m: Measure[T, M]): Option[T] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this match {
       case Empty()         => None()
@@ -675,14 +639,14 @@ sealed trait FingerTree[T, M]:
     }
   }.ensuring(res =>
     res.isDefined != this.isEmpty &&
-      res == this.toListR().headOption &&
-      res == this.toListL().lastOption
+      res == this.toListR(0).headOption &&
+      res == this.toListL(0).lastOption
   )
 
   /// Potentially gets "tail" of right-ordered list represented by tree,
   /// i.e. all except the last element of left-ordered list represented by tree
   def tailR(implicit m: Measure[T, M]): Option[FingerTree[T, M]] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this.viewR match {
       case ConsV(_, rest) => {
@@ -697,14 +661,14 @@ sealed trait FingerTree[T, M]:
       (res match {
         case None() => true
         case Some(rest) =>
-          rest.isWellFormed &&
+          rest.isWellFormed(0) &&
           rest.toListR() == this.toListR().tail
       })
   )
 
   /// Splits a tree into its rightmost element and the rest of the tree
   def viewR(implicit m: Measure[T, M]): View[T, M] = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this match {
       case Empty()             => NilV()
@@ -732,7 +696,7 @@ sealed trait FingerTree[T, M]:
       (res match {
         case NilV() => true
         case ConsV(head, rest) =>
-          rest.isWellFormed &&
+          rest.isWellFormed(0) &&
           Some[T](head) == this.toListR().headOption &&
           Some[T](head) == this.toListL().lastOption &&
           rest.toListR() == this.toListR().tail
@@ -754,7 +718,7 @@ sealed trait FingerTree[T, M]:
 
   /// A wrapper around isEmpty(BigInt) that begins from the root of the tree
   def isEmpty(implicit m: Measure[T, M]): Boolean = {
-    require(m.isValid && this.isWellFormed)
+    require(m.isValid && this.isWellFormed(0))
 
     this.isEmpty(0)
   }.ensuring(res =>
@@ -891,15 +855,11 @@ sealed trait FingerTree[T, M]:
         )
 
         val elemsRec = elemsTree1 ++ elems ++ elemsTree2
+        check(elemsTree1.size >= 1 && elemsTree2.size >= 1)
         val newElems = Helpers.toNodes(elemsRec, depth)
 
         val newSpine = concat(spine1, newElems, spine2, depth + 1)
-        Deep(
-          prefix1,
-          newSpine,
-          suffix2,
-          m.apply(prefix1.measure(), newSpine.measure(), suffix2.measure())
-        )
+        makeDeep(prefix1, newSpine, suffix2, depth)
       }
     }
   }.ensuring(res =>
@@ -917,11 +877,11 @@ sealed trait FingerTree[T, M]:
   def concat(
       tree: FingerTree[T, M]
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
-    require(m.isValid && this.isWellFormed && tree.isWellFormed)
+    require(m.isValid && this.isWellFormed(0) && tree.isWellFormed(0))
 
     concat(this, Nil(), tree, 0)
   }.ensuring(res =>
-    res.isWellFormed &&
+    res.isWellFormed(0) &&
       res.toListL() == this.toListL() ++ tree.toListL() &&
       res.toListR() == tree.toListR() ++ this.toListR()
   )
@@ -930,11 +890,11 @@ sealed trait FingerTree[T, M]:
   def ++[T, M](tree1: FingerTree[T, M], tree2: FingerTree[T, M])(implicit
       m: Measure[T, M]
   ): FingerTree[T, M] = {
-    require(m.isValid && tree1.isWellFormed && tree2.isWellFormed)
+    require(m.isValid && tree1.isWellFormed(0) && tree2.isWellFormed(0))
 
     tree1.concat(tree2)
   }.ensuring(res =>
-    res.isWellFormed &&
+    res.isWellFormed(0) &&
       res.toListL() == tree1.toListL() ++ tree2.toListL() &&
       res.toListR() == tree2.toListR() ++ tree1.toListR()
   )
@@ -951,6 +911,75 @@ sealed trait FingerTree[T, M]:
     }
   }
 
+  private def split(depth: BigInt, acc: M)(implicit
+      p: M => Boolean,
+      m: Measure[T, M]
+  ): (FingerTree[T, M], Node[T, M], FingerTree[T, M]) = {
+    decreases(this)
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        this.isWellFormed(depth) &&
+        !p(acc) && p(m(acc, this.measure()))
+    )
+
+    this match {
+      case Single(value) => (Empty(), value, Empty())
+      case Deep(prefix, spine, suffix, _) if p(m(acc, prefix.measure())) =>
+        val (pref, elem, suff) = prefix.split(depth, acc, p)
+        val previous = pref match {
+          case Some(prev) => prev.toTree(depth)
+          case None()     => Empty[T, M]()
+        }
+        (previous, elem, Helpers.deepL(suff, spine, suffix, depth))
+      case Deep(prefix, spine, suffix, _) if p(m(acc, prefix.measure())) =>
+        check(p(m(acc, prefix.measure(), spine.measure())))
+        val (pref, elem, suff) =
+          spine.split(depth + 1, m(acc, prefix.measure()))
+        val (newpref, newelem, newsuff) = elem
+          .toDigit(depth)
+          .split(depth, m(acc, prefix.measure(), pref.measure()), p)
+        (
+          Helpers.deepR(prefix, pref, newpref, depth),
+          newelem,
+          Helpers.deepL(newsuff, suff, suffix, depth)
+        )
+      case Deep(prefix, spine, suffix, _) =>
+        val (pref, elem, suff) =
+          suffix.split(depth, m(acc, prefix.measure(), spine.measure()), p)
+        val following = suff match {
+          case Some(foll) => foll.toTree(depth)
+          case None()     => Empty[T, M]()
+        }
+        (Helpers.deepR(prefix, spine, pref, depth), elem, following)
+      case Empty() => ???
+    }
+  }.ensuring { case (pref, elem, suff) =>
+    pref.isWellFormed(depth) &&
+    suff.isWellFormed(depth) &&
+    elem.isWellFormed(depth) &&
+    !p(pref.measure()) && p(m(pref.measure(), elem.measure()))
+  }
+
+  def split(
+      p: M => Boolean
+  )(implicit m: Measure[T, M]): (FingerTree[T, M], T, FingerTree[T, M]) = {
+    require(
+      m.isValid &&
+        this.isWellFormed(0) &&
+        !p(m.zero) &&
+        p(this.measure())
+    )
+
+    this.split(0, m.zero)(p, m) match {
+      case (pref, Leaf(elem), suff) => (pref, elem, suff)
+      case (_, _, _)                => ???
+    }
+  }.ensuring { case (pref, elem, suff) =>
+    pref.isWellFormed(0) && suff.isWellFormed(0) &&
+    !p(pref.measure()) && p(m(pref.measure(), m(elem)))
+  }
+
 /// A FingerTree[T] is either a:
 /// - Empty[T](),
 /// - Single[T](Node[T]), or
@@ -963,3 +992,26 @@ final case class Deep[T, M](
     suffix: Digit[T, M],
     m: M
 ) extends FingerTree[T, M]
+
+object TreeHelpers {
+  def makeDeep[T, M](
+      prefix: Digit[T, M],
+      spine: FingerTree[T, M],
+      suffix: Digit[T, M],
+      depth: BigInt
+  )(implicit m: Measure[T, M]): FingerTree[T, M] = {
+    require(
+      depth >= 0 &&
+        m.isValid &&
+        prefix.isWellFormed(depth) &&
+        spine.isWellFormed(depth + 1) &&
+        suffix.isWellFormed(depth)
+    )
+    Deep(
+      prefix,
+      spine,
+      suffix,
+      m(prefix.measure(), spine.measure(), suffix.measure())
+    )
+  }.ensuring(_.isWellFormed(depth))
+}
