@@ -25,7 +25,8 @@ trait Measure[T, M] {
     forall((x: M, y: M, z: M) => this(this(x, y), z) == this(x, this(y, z)))
 
   final def zeroIsNeutral: Boolean =
-    forall((x: M) => this(zero, x) == x && this(x, zero) == x)
+    forall((x: M) => this(zero, x) == x) &&
+      forall((x: M) => this(x, zero) == x)
 
   final def isValid: Boolean =
     zeroIsNeutral && isAssociative

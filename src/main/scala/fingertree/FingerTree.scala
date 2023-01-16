@@ -971,6 +971,7 @@ sealed trait FingerTree[T, M]:
         p(this.measure())
     )
 
+    check(this.measure() == m(m.zero, this.measure()))
     this.split(0, m.zero)(p, m) match {
       case (pref, Leaf(elem), suff) => (pref, elem, suff)
       case (_, _, _)                => ???

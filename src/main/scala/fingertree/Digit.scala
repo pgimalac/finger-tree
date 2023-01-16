@@ -95,10 +95,46 @@ sealed trait Digit[T, M]:
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
 
     this match {
-      case Digit1(a)             => a
-      case Digit2(_, b, _)       => b
-      case Digit3(_, _, c, _)    => c
-      case Digit4(_, _, _, d, _) => d
+      case Digit1(a) => a
+      case Digit2(a, b, _) =>
+        ListLemmas.lastConcat(a.toListL(depth), b.toListL(depth))
+        ListLemmas.headConcat(b.toListR(depth), a.toListR(depth))
+
+        b
+      case Digit3(a, b, c, _) =>
+        ListLemmas.lastConcat(a.toListL(depth), b.toListL(depth))
+        ListLemmas.headConcat(b.toListR(depth), a.toListR(depth))
+        ListLemmas.lastConcat(
+          a.toListL(depth) ++ b.toListL(depth),
+          c.toListL(depth)
+        )
+        ListLemmas.headConcat(
+          c.toListR(depth) ++ b.toListR(depth),
+          a.toListR(depth)
+        )
+
+        c
+      case Digit4(a, b, c, d, _) =>
+        ListLemmas.lastConcat(a.toListL(depth), b.toListL(depth))
+        ListLemmas.headConcat(b.toListR(depth), a.toListR(depth))
+        ListLemmas.lastConcat(
+          a.toListL(depth) ++ b.toListL(depth),
+          c.toListL(depth)
+        )
+        ListLemmas.headConcat(
+          c.toListR(depth) ++ b.toListR(depth),
+          a.toListR(depth)
+        )
+        ListLemmas.lastConcat(
+          a.toListL(depth) ++ b.toListL(depth) ++ c.toListL(depth),
+          d.toListL(depth)
+        )
+        ListLemmas.headConcat(
+          d.toListR(depth) ++ c.toListR(depth) ++ b.toListR(depth),
+          a.toListR(depth)
+        )
+
+        d
     }
   }.ensuring(res =>
     res.isWellFormed(depth) &&
