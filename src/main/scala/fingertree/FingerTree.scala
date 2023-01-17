@@ -29,7 +29,7 @@ sealed trait FingerTree[T, M]:
         prefix.isWellFormed(depth) &&
         spine.isWellFormed(depth + 1) &&
         suffix.isWellFormed(depth) &&
-        measure == m(prefix.measure(), spine.measure(), suffix.measure())
+        measure == m(m(prefix.measure(), spine.measure()), suffix.measure())
     }
   }
 
@@ -185,10 +185,9 @@ sealed trait FingerTree[T, M]:
         check(
           m(
             value.measure(),
-            m(a.measure(), spine.measure(), suffix.measure())
+            m(m(a.measure(), spine.measure()), suffix.measure())
           ) == m(
-            m(value.measure(), a.measure()),
-            spine.measure(),
+            m(m(value.measure(), a.measure()), spine.measure()),
             suffix.measure()
           )
         )
@@ -246,7 +245,7 @@ sealed trait FingerTree[T, M]:
           newPrefix,
           spine,
           suffix,
-          m(newPrefix.measure(), spine.measure(), suffix.measure())
+          m(m(newPrefix.measure(), spine.measure()), suffix.measure())
         )
       }
       case Deep(Digit4(a, b, c, d, _), spine, suffix, _) => {
@@ -359,8 +358,11 @@ sealed trait FingerTree[T, M]:
     )
 
     this match {
-      case Empty() => Single(value)
+      case Empty() =>
+        MeasureLemmas.leftZero(value.measure())
+        Single(value)
       case Single(existingValue) =>
+        MeasureLemmas.rightZero(existingValue.measure())
         makeDeep(
           makeDigit(existingValue, depth),
           Empty(),
@@ -378,6 +380,12 @@ sealed trait FingerTree[T, M]:
           prefix.toListL(depth) ++ spine.toListL(depth + 1),
           a.toListL(depth),
           value.toListL(depth)
+        )
+        MeasureLemmas.associativity(
+          prefix.measure(),
+          spine.measure(),
+          a.measure(),
+          value.measure()
         )
 
         makeDeep(prefix, spine, makeDigit(a, value, depth), depth)
@@ -520,6 +528,7 @@ sealed trait FingerTree[T, M]:
   def addR(value: T)(implicit m: Measure[T, M]): FingerTree[T, M] = {
     require(m.isValid && this.isWellFormed(0))
 
+    ListLemmas.prependListConcat(value, this.toListR(0))
     this.addR(Leaf(value), 0)
   }.ensuring(res =>
     res.isWellFormed(0) &&
@@ -613,7 +622,8 @@ sealed trait FingerTree[T, M]:
           rest.isWellFormed(0) &&
           Some[T](head) == this.toListL().headOption &&
           Some[T](head) == this.toListR().lastOption &&
-          rest.toListL() == this.toListL().tail
+          rest.toListL() == this.toListL().tail &&
+          m(m(head), rest.measure()) == this.measure()
       })
   )
 
@@ -699,7 +709,8 @@ sealed trait FingerTree[T, M]:
           rest.isWellFormed(0) &&
           Some[T](head) == this.toListR().headOption &&
           Some[T](head) == this.toListL().lastOption &&
-          rest.toListR() == this.toListR().tail
+          rest.toListR() == this.toListR().tail &&
+          m(rest.measure(), m(head)) == this.measure()
       })
   )
 
@@ -933,12 +944,12 @@ sealed trait FingerTree[T, M]:
         }
         (previous, elem, Helpers.deepL(suff, spine, suffix, depth))
       case Deep(prefix, spine, suffix, _) if p(m(acc, prefix.measure())) =>
-        check(p(m(acc, prefix.measure(), spine.measure())))
+        check(p(m(m(acc, prefix.measure()), spine.measure())))
         val (pref, elem, suff) =
           spine.split(depth + 1, m(acc, prefix.measure()))
         val (newpref, newelem, newsuff) = elem
           .toDigit(depth)
-          .split(depth, m(acc, prefix.measure(), pref.measure()), p)
+          .split(depth, m(m(acc, prefix.measure()), pref.measure()), p)
         (
           Helpers.deepR(prefix, pref, newpref, depth),
           newelem,
@@ -946,7 +957,7 @@ sealed trait FingerTree[T, M]:
         )
       case Deep(prefix, spine, suffix, _) =>
         val (pref, elem, suff) =
-          suffix.split(depth, m(acc, prefix.measure(), spine.measure()), p)
+          suffix.split(depth, m(m(acc, prefix.measure()), spine.measure()), p)
         val following = suff match {
           case Some(foll) => foll.toTree(depth)
           case None()     => Empty[T, M]()
@@ -1012,7 +1023,13 @@ object TreeHelpers {
       prefix,
       spine,
       suffix,
-      m(prefix.measure(), spine.measure(), suffix.measure())
+      m(m(prefix.measure(), spine.measure()), suffix.measure())
     )
-  }.ensuring(_.isWellFormed(depth))
+  }.ensuring(res =>
+    res.isWellFormed(depth) &&
+      res.toListL(depth) ==
+      suffix.toListL(depth) ++ spine.toListL(depth) ++ prefix.toListL(depth) &&
+      res.toListR(depth) ==
+      prefix.toListR(depth) ++ spine.toListR(depth) ++ suffix.toListR(depth)
+  )
 }

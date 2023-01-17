@@ -13,11 +13,11 @@ trait Measure[T, M] {
 
   def apply(a: M, b: M): M
 
-  final def apply(a: M, b: M, c: M): M =
-    this(this(a, b), c)
+  // final inline def apply(a: M, b: M, c: M): M =
+  //   this(this(a, b), c)
 
-  final def apply(a: M, b: M, c: M, d: M): M =
-    this(this(this(a, b), c), d)
+  // final inline def apply(a: M, b: M, c: M, d: M): M =
+  //   this(this(this(a, b), c), d)
 
   /// *** PROPERTIES *** ///
 

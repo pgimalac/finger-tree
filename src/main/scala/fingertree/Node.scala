@@ -30,7 +30,7 @@ sealed trait Node[T, M]:
         left.isWellFormed(depth - 1) &&
         middle.isWellFormed(depth - 1) &&
         right.isWellFormed(depth - 1) &&
-        measure == m(left.measure(), middle.measure(), right.measure())
+        measure == m(m(left.measure(), middle.measure()), right.measure())
     }
   }
 
@@ -143,7 +143,11 @@ object NodeHelpers {
         b.isWellFormed(depth)
     )
     Node2(a, b, m(a.measure(), b.measure()))
-  }.ensuring(_.isWellFormed(depth + 1))
+  }.ensuring(res =>
+    res.isWellFormed(depth + 1) &&
+      res.toListL(depth + 1) == a.toListL(depth) ++ b.toListL(depth) &&
+      res.toListR(depth + 1) == b.toListR(depth) ++ a.toListR(depth)
+  )
 
   def makeNode[T, M](
       a: Node[T, M],
@@ -160,6 +164,12 @@ object NodeHelpers {
         b.isWellFormed(depth) &&
         c.isWellFormed(depth)
     )
-    Node2(a, b, m(a.measure(), b.measure(), c.measure()))
-  }.ensuring(_.isWellFormed(depth + 1))
+    Node3(a, b, c, m(m(a.measure(), b.measure()), c.measure()))
+  }.ensuring(res =>
+    res.isWellFormed(depth + 1) &&
+      res.toListL(depth + 1) ==
+      a.toListL(depth) ++ b.toListL(depth) ++ c.toListL(depth) &&
+      res.toListR(depth + 1) ==
+      c.toListR(depth) ++ b.toListR(depth) ++ a.toListR(depth)
+  )
 }

@@ -28,11 +28,12 @@ sealed trait Digit[T, M]:
       case Digit3(a, b, c, measure) =>
         a.isWellFormed(depth) && b.isWellFormed(depth) &&
         c.isWellFormed(depth) &&
-        measure == m(a.measure(), b.measure(), c.measure())
+        measure == m(m(a.measure(), b.measure()), c.measure())
       case Digit4(a, b, c, d, measure) =>
         a.isWellFormed(depth) && b.isWellFormed(depth) &&
         c.isWellFormed(depth) && d.isWellFormed(depth) &&
-        measure == m(a.measure(), b.measure(), c.measure(), d.measure())
+        measure ==
+          m(m(m(a.measure(), b.measure()), c.measure()), d.measure())
     }
   }
 
@@ -332,16 +333,16 @@ sealed trait Digit[T, M]:
         (Some(makeDigit(a, depth)), b, None())
       case Digit3(a, b, c, _) if p(m(acc, a.measure())) =>
         (None(), a, Some(makeDigit(b, c, depth)))
-      case Digit3(a, b, c, _) if p(m(acc, a.measure(), b.measure())) =>
+      case Digit3(a, b, c, _) if p(m(m(acc, a.measure()), b.measure())) =>
         (Some(makeDigit(a, depth)), b, Some(makeDigit(c, depth)))
       case Digit3(a, b, c, _) =>
         (Some(makeDigit(a, b, depth)), c, None())
       case Digit4(a, b, c, d, _) if p(m(acc, a.measure())) =>
         (None(), a, Some(makeDigit(b, c, d, depth)))
-      case Digit4(a, b, c, d, _) if p(m(acc, a.measure(), b.measure())) =>
+      case Digit4(a, b, c, d, _) if p(m(m(acc, a.measure()), b.measure())) =>
         (Some(makeDigit(a, depth)), b, Some(makeDigit(c, d, depth)))
       case Digit4(a, b, c, d, _)
-          if p(m(acc, a.measure(), b.measure(), c.measure())) =>
+          if p(m(m(m(acc, a.measure()), b.measure()), c.measure())) =>
         (Some(makeDigit(a, b, depth)), c, Some(makeDigit(d, depth)))
       case Digit4(a, b, c, d, _) =>
         (Some(makeDigit(a, b, c, depth)), d, None())
@@ -405,7 +406,8 @@ object DigitHelpers {
   }.ensuring(res =>
     res.isWellFormed(depth) &&
       res.toListL(depth) == a.toListL(depth) &&
-      res.toListR(depth) == a.toListR(depth)
+      res.toListR(depth) == a.toListR(depth) &&
+      res.measure() == a.measure()
   )
 
   inline def makeDigit[T, M](a: Node[T, M], b: Node[T, M], depth: BigInt)(
@@ -421,7 +423,8 @@ object DigitHelpers {
   }.ensuring(res =>
     res.isWellFormed(depth) &&
       res.toListL(depth) == a.toListL(depth) ++ b.toListL(depth) &&
-      res.toListR(depth) == b.toListR(depth) ++ a.toListR(depth)
+      res.toListR(depth) == b.toListR(depth) ++ a.toListR(depth) &&
+      res.measure() == m(a.measure(), b.measure())
   )
 
   inline def makeDigit[T, M](
@@ -440,13 +443,14 @@ object DigitHelpers {
         c.isWellFormed(depth)
     )
 
-    Digit3[T, M](a, b, c, m(a.measure(), b.measure(), c.measure()))
+    Digit3[T, M](a, b, c, m(m(a.measure(), b.measure()), c.measure()))
   }.ensuring(res =>
     res.isWellFormed(depth) &&
       res.toListL(depth) == a.toListL(depth) ++ b.toListL(depth)
       ++ c.toListR(depth) &&
       res.toListR(depth) == c.toListR(depth) ++ b.toListR(depth)
-      ++ a.toListR(depth)
+      ++ a.toListR(depth) &&
+      res.measure() == m(m(a.measure(), b.measure()), c.measure())
   )
 
   inline def makeDigit[T, M](
@@ -472,13 +476,15 @@ object DigitHelpers {
       b,
       c,
       d,
-      m(a.measure(), b.measure(), c.measure(), d.measure())
+      m(m(m(a.measure(), b.measure()), c.measure()), d.measure())
     )
   }.ensuring(res =>
     res.isWellFormed(depth) &&
       res.toListL(depth) == a.toListL(depth) ++ b.toListL(depth)
       ++ c.toListR(depth) ++ d.toListL(depth) &&
       res.toListR(depth) == d.toListR(depth) ++ c.toListR(depth)
-      ++ b.toListR(depth) ++ a.toListR(depth)
+      ++ b.toListR(depth) ++ a.toListR(depth) &&
+      res.measure() ==
+      m(m(m(a.measure(), b.measure()), c.measure()), d.measure())
   )
 }
