@@ -49,7 +49,7 @@ object Helpers {
   def toNodes[T, M](elems: List[Node[T, M]], depth: BigInt)(implicit
       m: Measure[T, M]
   ): List[Node[T, M]] = {
-    decreases(elems)
+    decreases(elems.size)
     require(
       depth >= 0
         && elems.size >= 2
@@ -86,11 +86,11 @@ object Helpers {
         )
         check(
           toListL(Cons(c, Cons(d, Nil())), depth) ==
-            c.toListL(depth) ++ d.toListL(depth)
+            c.toListL(depth) ++ d.toListL(depth) ++ Nil()
         )
         check(
           toListR(Cons(c, Cons(d, Nil())), depth) ==
-            d.toListR(depth) ++ c.toListR(depth)
+            Nil() ++ d.toListR(depth) ++ c.toListR(depth)
         )
         List[Node[T, M]](makeNode(a, b, depth), makeNode(c, d, depth))
       case Cons(a, Cons(b, Cons(c, tail))) => {

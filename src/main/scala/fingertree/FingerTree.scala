@@ -741,40 +741,39 @@ sealed trait FingerTree[T, M]:
 
   /// Concatenates two trees together, as if concatenating the two underlying sequences
   private def concat(
-      tree1: FingerTree[T, M],
       elems: List[Node[T, M]],
-      tree2: FingerTree[T, M],
+      other: FingerTree[T, M],
       depth: BigInt
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
     require(
       depth >= 0 &&
         m.isValid &&
-        tree1.isWellFormed(depth) &&
-        tree2.isWellFormed(depth) &&
+        this.isWellFormed(depth) &&
+        other.isWellFormed(depth) &&
         elems.forall(_.isWellFormed(depth))
     )
-    decreases(tree1)
+    decreases(this)
 
-    (tree1, tree2) match {
-      case (Empty(), _) => tree2.addL(elems, depth)
-      case (_, Empty()) => tree1.addR(elems, depth)
+    (this, other) match {
+      case (Empty(), _) => other.addL(elems, depth)
+      case (_, Empty()) => this.addR(elems, depth)
       case (Single(e), _) => {
         ListLemmas.associativeConcat(
-          tree1.toListL(depth),
+          this.toListL(depth),
           Helpers.toListL(elems, depth),
-          tree2.toListL(depth)
+          other.toListL(depth)
         )
 
-        tree2.addL(elems, depth).addL(e, depth)
+        other.addL(elems, depth).addL(e, depth)
       }
       case (_, Single(e)) => {
         ListLemmas.associativeConcat(
-          tree2.toListR(depth),
+          other.toListR(depth),
           Helpers.toListR(elems, depth),
-          tree1.toListR(depth)
+          this.toListR(depth)
         )
 
-        tree1.addR(elems, depth).addR(e, depth)
+        this.addR(elems, depth).addR(e, depth)
       }
       case (
             Deep(prefix1, spine1, suffix1, _),
@@ -869,45 +868,30 @@ sealed trait FingerTree[T, M]:
         check(elemsTree1.size >= 1 && elemsTree2.size >= 1)
         val newElems = Helpers.toNodes(elemsRec, depth)
 
-        val newSpine = concat(spine1, newElems, spine2, depth + 1)
+        val newSpine = spine1.concat(newElems, spine2, depth + 1)
         makeDeep(prefix1, newSpine, suffix2, depth)
       }
     }
   }.ensuring(res =>
     res.isWellFormed(depth) &&
-      res.toListL(depth) == tree1.toListL(depth)
-      ++ Helpers.toListL(elems, depth)
-      ++ tree2.toListL(depth) &&
-      res.toListR(depth) == tree2.toListR(depth)
-      ++ Helpers.toListR(elems, depth)
-      ++ tree1.toListR(depth)
+      res.toListL(depth) == this.toListL(depth) ++
+      Helpers.toListL(elems, depth) ++ other.toListL(depth) &&
+      res.toListR(depth) == other.toListR(depth) ++
+      Helpers.toListR(elems, depth) ++ this.toListR(depth)
   )
 
-  /// A wrapper around concat(FingerTree[T], List[Node[T]], FingerTree[T], BigInt)
+  /// A wrapper around concat(List[Node[T]], FingerTree[T], BigInt)
   /// that begins from the root of the tree
   def concat(
       tree: FingerTree[T, M]
   )(implicit m: Measure[T, M]): FingerTree[T, M] = {
     require(m.isValid && this.isWellFormed(0) && tree.isWellFormed(0))
 
-    concat(this, Nil(), tree, 0)
+    this.concat(Nil(), tree, 0)
   }.ensuring(res =>
     res.isWellFormed(0) &&
       res.toListL() == this.toListL() ++ tree.toListL() &&
       res.toListR() == tree.toListR() ++ this.toListR()
-  )
-
-  /// Sets concatenation operator for finger trees to concat(FingerTree[T])
-  def ++[T, M](tree1: FingerTree[T, M], tree2: FingerTree[T, M])(implicit
-      m: Measure[T, M]
-  ): FingerTree[T, M] = {
-    require(m.isValid && tree1.isWellFormed(0) && tree2.isWellFormed(0))
-
-    tree1.concat(tree2)
-  }.ensuring(res =>
-    res.isWellFormed(0) &&
-      res.toListL() == tree1.toListL() ++ tree2.toListL() &&
-      res.toListR() == tree2.toListR() ++ tree1.toListR()
   )
 
   /// *** MEASURE *** ///
@@ -963,7 +947,9 @@ sealed trait FingerTree[T, M]:
           case None()     => Empty[T, M]()
         }
         (Helpers.deepR(prefix, spine, pref, depth), elem, following)
-      case Empty() => ???
+      case Empty() =>
+        MeasureLemmas.rightZero(acc)
+        ???
     }
   }.ensuring { case (pref, elem, suff) =>
     pref.isWellFormed(depth) &&
@@ -1027,9 +1013,9 @@ object TreeHelpers {
     )
   }.ensuring(res =>
     res.isWellFormed(depth) &&
-      res.toListL(depth) ==
-      suffix.toListL(depth) ++ spine.toListL(depth) ++ prefix.toListL(depth) &&
-      res.toListR(depth) ==
-      prefix.toListR(depth) ++ spine.toListR(depth) ++ suffix.toListR(depth)
+      res.toListL(depth) == suffix.toListL(depth) ++
+      spine.toListL(depth + 1) ++ prefix.toListL(depth) &&
+      res.toListR(depth) == prefix.toListR(depth) ++
+      spine.toListR(depth + 1) ++ suffix.toListR(depth)
   )
 }

@@ -39,6 +39,15 @@ sealed trait Digit[T, M]:
 
   /// ***CONVERSION AND HELPER FUNCTIONS*** ///
 
+  def length: BigInt = {
+    this match {
+      case Digit1(_)             => 1
+      case Digit2(_, _, _)       => 2
+      case Digit3(_, _, _, _)    => 3
+      case Digit4(_, _, _, _, _) => 4
+    }
+  }
+
   /// Gets first segment in a digit
   def headL(depth: BigInt)(implicit m: Measure[T, M]): Node[T, M] = {
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
@@ -171,7 +180,7 @@ sealed trait Digit[T, M]:
   /// Converts a digit to a list of Node[T]'s, for easier proof ergonomics
   def toNodeList(depth: BigInt)(implicit m: Measure[T, M]): List[Node[T, M]] = {
     require(depth >= 0 && m.isValid && this.isWellFormed(depth))
-    decreases(this)
+    decreases(this.length)
 
     this.tailL(depth) match {
       case None() => List(this.headL(depth))
@@ -317,12 +326,12 @@ sealed trait Digit[T, M]:
   def split(depth: BigInt, acc: M, p: M => Boolean)(implicit
       m: Measure[T, M]
   ): (Option[Digit[T, M]], Node[T, M], Option[Digit[T, M]]) = {
-    decreases(this)
+    decreases(this.length)
     require(
       depth >= 0 &&
         m.isValid &&
         this.isWellFormed(depth) &&
-        !p(acc) && p(this.measure())
+        !p(acc) && p(m(acc, this.measure()))
     )
 
     this match {
